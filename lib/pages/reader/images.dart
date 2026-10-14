@@ -690,6 +690,10 @@ const Set<PointerDeviceKind> _kTouchLikeDeviceTypes = <PointerDeviceKind>{
 
 const double _kChangeChapterOffset = 160;
 
+// Use finger travel for a new swipe at the boundary. Elastic overscroll is
+// damped and may be unavailable when a short chapter fits in the viewport.
+const double _kChapterSwipeDistance = 64;
+
 class _ContinuousMode extends StatefulWidget {
   const _ContinuousMode({super.key});
 
@@ -723,7 +727,8 @@ class _ContinuousModeState extends State<_ContinuousMode>
   bool get _visibleImagesReady =>
       imageStates.isNotEmpty &&
       imageStates.every(
-        (state) => state is _ComicImageState &&
+        (state) =>
+            state is _ComicImageState &&
             (state._imageInfo != null || state._lastException != null),
       );
 
@@ -767,6 +772,38 @@ class _ContinuousModeState extends State<_ContinuousMode>
   bool prepareToNextChapter = false;
   bool jumpToNextChapter = false;
   bool jumpToPrevChapter = false;
+
+  bool _swipeStartedAtChapterStart = false;
+  bool _swipeStartedAtChapterEnd = false;
+  bool _chapterSwipeAllowed = false;
+  Offset _chapterSwipeDelta = Offset.zero;
+  bool _chapterNavigationPending = false;
+
+  void _resetChapterSwipe() {
+    _chapterSwipeAllowed = false;
+    _swipeStartedAtChapterStart = false;
+    _swipeStartedAtChapterEnd = false;
+    _chapterSwipeDelta = Offset.zero;
+    jumpToNextChapter = false;
+    jumpToPrevChapter = false;
+  }
+
+  double _readingDelta(Offset delta) =>
+      reader.mode == ReaderMode.continuousTopToBottom
+      ? -delta.dy
+      : reader.mode == ReaderMode.continuousRightToLeft
+      ? delta.dx
+      : -delta.dx;
+
+  void _scrollInReadingDirection(double delta) {
+    if (delta == 0 || _chapterNavigationPending) return;
+    final forward = delta > 0;
+    if (!isZoomedIn && (forward ? isAtChapterEnd : isAtChapterStart)) {
+      _chapterNavigationPending = reader.turnPage(forward: forward);
+      return;
+    }
+    smoothTo(delta);
+  }
 
   bool isZoomedIn = false;
   bool isLongPressing = false;
@@ -926,7 +963,13 @@ class _ContinuousModeState extends State<_ContinuousMode>
       if (isCTRLPressed) {
         return;
       }
-      smoothTo(event.scrollDelta.dy);
+      final horizontal = reader.mode != ReaderMode.continuousTopToBottom;
+      final delta =
+          horizontal && event.scrollDelta.dx.abs() > event.scrollDelta.dy.abs()
+          ? event.scrollDelta.dx *
+                (reader.mode == ReaderMode.continuousRightToLeft ? -1 : 1)
+          : event.scrollDelta.dy;
+      _scrollInReadingDirection(delta);
     }
   }
 
@@ -962,6 +1005,7 @@ class _ContinuousModeState extends State<_ContinuousMode>
       context.readerScaffold.setFloatingButton(0);
     }
     var isZoomedIn = (scale ?? photoViewController.scale) != 1.0;
+    if (isZoomedIn) _resetChapterSwipe();
     if (isZoomedIn != this.isZoomedIn) {
       setState(() {
         this.isZoomedIn = isZoomedIn;
@@ -1093,6 +1137,12 @@ class _ContinuousModeState extends State<_ContinuousMode>
     widget = Listener(
       onPointerDown: (event) {
         fingers++;
+        _resetChapterSwipe();
+        if (fingers == 1 && !isZoomedIn) {
+          _chapterSwipeAllowed = true;
+          _swipeStartedAtChapterStart = isAtChapterStart;
+          _swipeStartedAtChapterEnd = isAtChapterEnd;
+        }
         if (fingers > 1 && !disableScroll) {
           setState(() {
             disableScroll = true;
@@ -1113,17 +1163,41 @@ class _ContinuousModeState extends State<_ContinuousMode>
           });
         }
         if (fingers == 0) {
-          if (jumpToPrevChapter) {
-            context.readerScaffold.setFloatingButton(0);
-            reader.toPrevChapter(toLastPage: true);
-          } else if (jumpToNextChapter) {
-            context.readerScaffold.setFloatingButton(0);
-            reader.toNextChapter();
+          if (!_chapterSwipeAllowed) {
+            _resetChapterSwipe();
+            return;
           }
+          final travel = _readingDelta(_chapterSwipeDelta);
+          final crossTravel = reader.mode == ReaderMode.continuousTopToBottom
+              ? _chapterSwipeDelta.dx.abs()
+              : _chapterSwipeDelta.dy.abs();
+          final nextSwipe =
+              _swipeStartedAtChapterEnd &&
+              travel >= _kChapterSwipeDistance &&
+              travel > crossTravel;
+          final prevSwipe =
+              _swipeStartedAtChapterStart &&
+              -travel >= _kChapterSwipeDistance &&
+              -travel > crossTravel;
+          if (!isZoomedIn &&
+              !_chapterNavigationPending &&
+              (jumpToPrevChapter || prevSwipe) &&
+              !reader.isFirstChapterOfGroup) {
+            context.readerScaffold.setFloatingButton(0);
+            _chapterNavigationPending = reader.toPrevChapter(toLastPage: true);
+          } else if (!isZoomedIn &&
+              !_chapterNavigationPending &&
+              (jumpToNextChapter || nextSwipe) &&
+              !reader.isLastChapterOfGroup) {
+            context.readerScaffold.setFloatingButton(0);
+            _chapterNavigationPending = reader.toNextChapter();
+          }
+          _resetChapterSwipe();
         }
       },
       onPointerCancel: (event) {
         fingers--;
+        _resetChapterSwipe();
         if (fingers <= 1 && disableScroll) {
           setState(() {
             disableScroll = false;
@@ -1132,11 +1206,14 @@ class _ContinuousModeState extends State<_ContinuousMode>
       },
       onPointerPanZoomUpdate: (event) {
         if (event.scale == 1.0) {
-          smoothTo(0 - event.panDelta.dy);
+          _scrollInReadingDirection(_readingDelta(event.panDelta));
         }
       },
       onPointerMove: (event) {
         Offset value = event.delta;
+        if (fingers == 1 && !isZoomedIn) {
+          _chapterSwipeDelta += value;
+        }
         if (photoViewController.scale == 1 || fingers != 1) {
           return;
         }
@@ -1359,24 +1436,19 @@ class _ContinuousModeState extends State<_ContinuousMode>
         event.logicalKey == LogicalKeyboardKey.arrowRight) {
       forward = false;
     }
-    if (forward == true) {
-      scrollController.animateTo(
-        scrollController.offset + context.height * 0.25,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.ease,
-      );
-    } else if (forward == false) {
-      scrollController.animateTo(
-        scrollController.offset - context.height * 0.25,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.ease,
+    if (forward != null) {
+      _scrollInReadingDirection(
+        scrollController.position.viewportDimension * (forward ? .25 : -.25),
       );
     }
   }
 
   @override
   bool handleOnTap(Offset location) {
-    if (delayedIsScrolling) {
+    // A boundary can still be bouncing after a swipe/trackpad gesture. The
+    // next edge tap must be able to continue reading instead of being eaten
+    // by the delayed scrolling guard.
+    if (delayedIsScrolling && !isAtChapterStart && !isAtChapterEnd) {
       return true;
     }
     return false;
