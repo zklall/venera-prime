@@ -8,8 +8,6 @@ class AboutSettings extends StatefulWidget {
 }
 
 class _AboutSettingsState extends State<AboutSettings> {
-  bool isCheckingUpdate = false;
-
   @override
   Widget build(BuildContext context) {
     return SmoothCustomScrollView(
@@ -45,22 +43,32 @@ class _AboutSettingsState extends State<AboutSettings> {
             const SizedBox(height: 8),
           ],
         ).paddingHorizontal(24).toSliver(),
-        ListTile(
-          title: Text("Check for updates".tl),
-          trailing: Button.filled(
-            isLoading: isCheckingUpdate,
-            child: Text("Check".tl),
-            onPressed: () {
-              setState(() {
-                isCheckingUpdate = true;
-              });
-              checkUpdateUi().then((value) {
-                setState(() {
-                  isCheckingUpdate = false;
-                });
-              });
-            },
-          ).fixHeight(32),
+        ListenableBuilder(
+          listenable: BackgroundTasks.instance,
+          builder: (context, _) {
+            final task = BackgroundTasks.instance.latest('app-update-check');
+            final hasUpdate =
+                task?.status == BackgroundTaskStatus.completed &&
+                task?.onOpenResult != null;
+            return ListTile(
+              title: Text("Check for updates".tl),
+              subtitle: hasUpdate
+                  ? Text('New version available'.tl)
+                  : const TaskStatusText(taskKey: 'app-update-check'),
+              trailing: Button.filled(
+                child: Text(
+                  task?.isRunning == true
+                      ? "Checking".tl
+                      : hasUpdate
+                      ? "View update".tl
+                      : "Check".tl,
+                ),
+                onPressed: hasUpdate
+                    ? task!.onOpenResult!
+                    : () => checkUpdateUi(),
+              ).fixHeight(32),
+            );
+          },
         ).toSliver(),
         _SwitchSetting(
           title: "Check for updates on startup".tl,
@@ -74,29 +82,15 @@ class _AboutSettingsState extends State<AboutSettings> {
           },
         ).toSliver(),
         ListTile(
-          title: const Text("Telegram"),
+          title: Text("Telegram group chat".tl),
           trailing: const Icon(Icons.open_in_new),
           onTap: () {
-            launchUrlString("https://t.me/venera_release");
+            launchUrlString("https://t.me/+-Z0d_TB_Alk0YzU1");
           },
         ).toSliver(),
       ],
     );
   }
-}
-
-class LatestRelease {
-  final String version;
-  final String title;
-  final String body;
-  final String url;
-
-  const LatestRelease({
-    required this.version,
-    required this.title,
-    required this.body,
-    required this.url,
-  });
 }
 
 Future<LatestRelease?> checkUpdate() async {
@@ -110,87 +104,73 @@ Future<LatestRelease?> checkUpdate() async {
     ),
   );
   if (res.statusCode != 200 || res.data == null) {
-    return null;
+    throw StateError('Release request failed: ${res.statusCode}');
   }
-  final data = res.data!;
-  final tag = data["tag_name"]?.toString();
-  if (tag == null || tag.isEmpty) {
-    return null;
+  return LatestRelease.fromJson(res.data!);
+}
+
+Future<LatestRelease?> startAppUpdateCheck({
+  Future<LatestRelease?> Function()? fetch,
+}) => BackgroundTasks.instance.run<LatestRelease?>(
+  'app-update-check',
+  "Check for updates".tl,
+  (task) async {
+    final release = await (fetch ?? checkUpdate)();
+    if (release == null) {
+      throw const FormatException('Invalid release response');
+    }
+    if (isNewerAppVersion(release.version, App.version)) {
+      task.update(message: '${release.title} (${release.version})');
+      task.resultLabel = "View update".tl;
+      task.onOpenResult = () => showAppUpdateDialog(release);
+    } else {
+      task.update(message: "No new version available".tl);
+    }
+    return release;
+  },
+);
+
+bool _appUpdateDialogOpen = false;
+
+Future<void> showAppUpdateDialog(LatestRelease release) async {
+  if (_appUpdateDialogOpen) return;
+  _appUpdateDialogOpen = true;
+  try {
+    await showDialog<void>(
+      context: App.rootContext,
+      builder: (_) => _AppUpdateDialog(release: release),
+    );
+  } finally {
+    _appUpdateDialogOpen = false;
   }
-  final version = tag.replaceFirst(RegExp(r"^[vV]"), '').split('+').first;
-  return LatestRelease(
-    version: version,
-    title: data["name"]?.toString().trim().isNotEmpty == true
-        ? data["name"].toString()
-        : tag,
-    body: data["body"]?.toString().trim() ?? '',
-    url:
-        data["html_url"]?.toString() ??
-        "https://github.com/venera-app/venera-prime/releases/latest",
-  );
 }
 
 Future<void> checkUpdateUi([
   bool showMessageIfNoUpdate = true,
   bool delay = false,
 ]) async {
+  final future = startAppUpdateCheck();
+  if (showMessageIfNoUpdate) {
+    // Closing/minimizing this dialog never cancels the owned job.
+    unawaited(
+      showBackgroundTask(
+        App.rootContext,
+        BackgroundTasks.instance.latest('app-update-check')!,
+        openResultOnCompletion: true,
+      ),
+    );
+  }
   try {
-    var release = await checkUpdate();
-    if (release != null && _compareVersion(release.version, App.version)) {
-      if (delay) {
-        await Future.delayed(const Duration(seconds: 2));
-      }
-      showDialog(
-        context: App.rootContext,
-        builder: (context) {
-          return ContentDialog(
-            title: "${release.title} (${release.version})",
-            content: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    "A new version is available. Do you want to update now?".tl,
-                  ),
-                  if (release.body.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Text(release.body),
-                  ],
-                ],
-              ).paddingHorizontal(16),
-            ),
-            actions: [
-              Button.text(
-                onPressed: () {
-                  Navigator.pop(context);
-                  launchUrlString(release.url);
-                },
-                child: Text("Update".tl),
-              ),
-            ],
-          );
-        },
-      );
-    } else if (showMessageIfNoUpdate) {
-      App.rootContext.showMessage(message: "No new version available".tl);
+    final release = await future;
+    // Startup notifies separately; manual checks open results only while their
+    // progress dialog is visible, keeping dismissed checks in the task center.
+    if (!showMessageIfNoUpdate &&
+        release != null &&
+        isNewerAppVersion(release.version, App.version)) {
+      if (delay) await Future<void>.delayed(const Duration(seconds: 2));
+      showAppUpdateDialog(release);
     }
-  } catch (e, s) {
-    Log.error("Check Update", e.toString(), s);
+  } catch (error, stack) {
+    Log.error('Check Update', error, stack);
   }
-}
-
-/// return true if version1 > version2
-bool _compareVersion(String version1, String version2) {
-  var v1 = version1.split(".");
-  var v2 = version2.split(".");
-  for (var i = 0; i < v1.length; i++) {
-    if (int.parse(v1[i]) > int.parse(v2[i])) {
-      return true;
-    }
-    if (int.parse(v1[i]) < int.parse(v2[i])) {
-      return false;
-    }
-  }
-  return false;
 }

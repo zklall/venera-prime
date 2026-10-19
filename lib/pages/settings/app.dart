@@ -13,6 +13,17 @@ class _AppSettingsState extends State<AppSettings> {
     return SmoothCustomScrollView(
       slivers: [
         SliverAppbar(title: Text("App".tl)),
+        _SettingPartTitle(title: "Background tasks".tl, icon: Icons.task_alt),
+        _SwitchSetting(
+          title: "Floating task button".tl,
+          settingKey: 'showBackgroundTaskButton',
+          subtitle: "Hiding the button does not stop background tasks.".tl,
+        ).toSliver(),
+        ListTile(
+          title: Text("Background tasks".tl),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => showBackgroundTasks(context),
+        ).toSliver(),
         _SettingPartTitle(title: "Data".tl, icon: Icons.storage),
         ListTile(
           title: Text("Storage Path for local comics".tl),
@@ -43,42 +54,69 @@ class _AppSettingsState extends State<AppSettings> {
               App.rootContext,
               barrierDismissible: false,
               allowCancel: false,
+              message: "Set New Storage Path".tl,
             );
-            var res = await LocalManager().setNewPath(result);
-            loadingDialog.close();
-            if (res != null) {
-              context.showMessage(message: res);
-            } else {
-              context.showMessage(message: "Path set successfully".tl);
-              setState(() {});
+            try {
+              final res = await ImportComic.withLibraryLock(
+                () => LocalManager().setNewPath(result!),
+              );
+              if (res != null) loadingDialog.fail(res);
+              if (!context.mounted) return;
+              context.showMessage(message: res ?? "Path set successfully".tl);
+              if (res == null) setState(() {});
+            } catch (error) {
+              loadingDialog.fail(error);
+              if (context.mounted) {
+                context.showMessage(message: error.toString());
+              }
+            } finally {
+              loadingDialog.close();
             }
           },
         ).toSliver(),
         _CallbackSetting(
           title: "Refresh local library".tl,
           callback: () async {
-            var loading = showLoadingDialog(
+            var cancelled = false;
+            final loading = showLoadingDialog(
               context,
-              barrierDismissible: false,
-              allowCancel: false,
+              allowBackground: true,
+              message: 'Refresh local library'.tl,
+              onCancel: () => cancelled = true,
             );
-            final result = await LocalManager().refresh();
-            loading.close();
-            if (context.mounted) {
-              context.showMessage(
-                message: "Found @found comics, @missing missing".tlParams({
-                  'found': result.discovered,
-                  'missing': result.missing,
-                }),
+            try {
+              final result = await ImportComic.withLibraryLock(
+                () => LocalManager().refresh(isCanceled: () => cancelled),
               );
+              if (cancelled) return;
+              final message = "Found @found comics, @missing missing".tlParams({
+                'found': result.discovered,
+                'missing': result.missing,
+              });
+              loading.setMessage(message);
+              if (context.mounted) context.showMessage(message: message);
+            } catch (error) {
+              loading.fail(error);
+              if (context.mounted) {
+                context.showMessage(message: error.toString());
+              }
+            } finally {
+              loading.close();
             }
           },
           actionTitle: "Refresh".tl,
         ).toSliver(),
-        ListTile(
-          title: Text("Cache Size".tl),
-          subtitle: Text(bytesToReadableString(CacheManager().currentSize)),
+        ValueListenableBuilder<int>(
+          valueListenable: CacheManager().sizeListenable,
+          builder: (context, size, _) => ListTile(
+            title: Text("Cache Size".tl),
+            subtitle: Text(bytesToReadableString(size)),
+          ),
         ).toSliver(),
+        const CacheRetentionSetting().toSliver(),
+        const TaskStatusText(
+          taskKey: 'cache-cleanup',
+        ).paddingHorizontal(16).toSliver(),
         _CallbackSetting(
           title: "Clear Cache".tl,
           actionTitle: "Clear".tl,
@@ -87,11 +125,20 @@ class _AppSettingsState extends State<AppSettings> {
               App.rootContext,
               barrierDismissible: false,
               allowCancel: false,
+              allowBackground: true,
+              taskKey: 'cache-clear',
+              message: 'Clear Cache'.tl,
             );
-            await CacheManager().clear();
-            loadingDialog.close();
-            context.showMessage(message: "Cache cleared".tl);
-            setState(() {});
+            try {
+              await CacheManager().clear();
+              if (context.mounted) {
+                context.showMessage(message: "Cache cleared".tl);
+              }
+            } catch (error) {
+              loadingDialog.fail(error);
+            } finally {
+              loadingDialog.close();
+            }
           },
         ).toSliver(),
         _CallbackSetting(
@@ -120,11 +167,21 @@ class _AppSettingsState extends State<AppSettings> {
               "Backups contain passwords, tokens and cookies. Store them securely and do not share them."
                   .tl,
           callback: () async {
-            var controller = showLoadingDialog(context);
+            final controller = showLoadingDialog(
+              context,
+              allowCancel: false,
+              allowBackground: true,
+              message: 'Export App Data'.tl,
+            );
             File? file;
             try {
               file = await exportAppData(false);
               await saveFile(filename: "data.venera", file: file);
+            } catch (error) {
+              controller.fail(error);
+              if (context.mounted) {
+                context.showMessage(message: error.toString());
+              }
             } finally {
               await file?.deleteIgnoreError();
               controller.close();
@@ -138,28 +195,57 @@ class _AppSettingsState extends State<AppSettings> {
               "Import only trusted backups. Saved accounts and login sessions will be restored."
                   .tl,
           callback: () async {
-            var controller = showLoadingDialog(context);
-            var file = await selectFile(ext: ['venera', 'picadata']);
-            if (file != null) {
-              var cacheFile = File(
-                FilePath.join(App.cachePath, "import_data_temp"),
-              );
+            final file = await selectFile(ext: ['venera', 'picadata']);
+            if (file == null || !context.mounted) return;
+            // Backup import replaces live databases, so keep its view modal.
+            final controller = showLoadingDialog(
+              context,
+              allowCancel: false,
+              barrierDismissible: false,
+              message: 'Import App Data'.tl,
+            );
+            final cacheFile = File(
+              FilePath.join(App.cachePath, 'import_data_temp'),
+            );
+            var skippedSources = <String>[];
+            try {
               await file.saveTo(cacheFile.path);
-              try {
-                if (file.name.endsWith('picadata')) {
-                  await importPicaData(cacheFile);
-                } else {
-                  await importAppData(cacheFile);
-                }
-              } catch (e, s) {
-                Log.error("Import data", e.toString(), s);
-                context.showMessage(message: "Failed to import data".tl);
-              } finally {
-                cacheFile.deleteIgnoreError();
-                App.forceRebuild();
+              if (file.name.endsWith('picadata')) {
+                await importPicaData(cacheFile);
+              } else {
+                skippedSources = await importAppData(cacheFile);
               }
+            } catch (error, stack) {
+              controller.fail(error);
+              Log.error('Import data', error, stack);
+              if (context.mounted) {
+                context.showMessage(message: 'Failed to import data'.tl);
+              }
+            } finally {
+              await cacheFile.deleteIgnoreError();
+              controller.close();
+              App.forceRebuild();
             }
-            controller.close();
+            if (skippedSources.isNotEmpty) {
+              await showDialog<void>(
+                context: App.rootContext,
+                builder: (context) => AlertDialog(
+                  title: Text('Import completed with warnings'.tl),
+                  scrollable: true,
+                  content: SelectableText(
+                    'Skipped empty source scripts: @files'.tlParams({
+                      'files': skippedSources.join('\n'),
+                    }),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: Text('Close'.tl),
+                    ),
+                  ],
+                ),
+              );
+            }
           },
           actionTitle: 'Import'.tl,
         ).toSliver(),
@@ -169,7 +255,7 @@ class _AppSettingsState extends State<AppSettings> {
               "WebDAV sync includes source accounts and cookies. Use a trusted HTTPS server."
                   .tl,
           callback: () async {
-            showPopUpWidget(context, const _WebdavSetting());
+            showWebdavSettings(context);
           },
           actionTitle: 'Set'.tl,
         ).toSliver(),
@@ -676,6 +762,9 @@ class _LogsPageState extends State<LogsPage> {
   }
 }
 
+Future<void> showWebdavSettings(BuildContext context) =>
+    showPopUpWidget<void>(context, const _WebdavSetting());
+
 class _WebdavSetting extends StatefulWidget {
   const _WebdavSetting();
 
@@ -717,8 +806,6 @@ class _WebdavSettingState extends State<_WebdavSetting> {
   void onAutoSyncChanged(bool value) {
     setState(() {
       autoSync = value;
-      appdata.implicitData['webdavAutoSync'] = value;
-      appdata.writeImplicitData();
     });
   }
 
@@ -922,59 +1009,85 @@ class _WebdavSettingState extends State<_WebdavSetting> {
             ),
             const SizedBox(height: 16),
             Center(
-              child: Button.filled(
-                isLoading: isTesting,
-                onPressed: () async {
-                  var oldConfig = appdata.settings['webdav'];
-                  var oldAutoSync = appdata.implicitData['webdavAutoSync'];
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                alignment: WrapAlignment.center,
+                children: [
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.save_outlined),
+                    label: Text('Save'.tl),
+                    onPressed: isTesting
+                        ? null
+                        : () async {
+                            appdata.settings['webdav'] =
+                                url.trim().isEmpty &&
+                                    user.trim().isEmpty &&
+                                    pass.trim().isEmpty
+                                ? []
+                                : [url.trim(), user, pass];
+                            appdata.settings['disableSyncFields'] = disableSync;
+                            appdata.implicitData['webdavAutoSync'] = autoSync;
+                            appdata.writeImplicitData();
+                            await appdata.saveData(false);
+                            if (!context.mounted) return;
+                            context.showMessage(message: 'Saved'.tl);
+                            App.rootPop();
+                          },
+                  ),
+                  Button.filled(
+                    isLoading: isTesting,
+                    onPressed: () async {
+                      var oldConfig = appdata.settings['webdav'];
+                      var oldAutoSync = appdata.implicitData['webdavAutoSync'];
+                      var oldDisableSync =
+                          appdata.settings['disableSyncFields'];
+                      final sync = DataSync();
 
-                  if (url.trim().isEmpty &&
-                      user.trim().isEmpty &&
-                      pass.trim().isEmpty) {
-                    appdata.settings['webdav'] = [];
-                    appdata.implicitData['webdavAutoSync'] = false;
-                    appdata.writeImplicitData();
-                    appdata.saveData(false);
-                    context.showMessage(message: "Saved".tl);
-                    App.rootPop();
-                    return;
-                  }
+                      if (url.trim().isEmpty &&
+                          user.trim().isEmpty &&
+                          pass.trim().isEmpty) {
+                        appdata.settings['webdav'] = [];
+                        appdata.implicitData['webdavAutoSync'] = false;
+                        appdata.writeImplicitData();
+                        appdata.saveData(false);
+                        context.showMessage(message: "Saved".tl);
+                        App.rootPop();
+                        return;
+                      }
 
-                  appdata.settings['webdav'] = [url, user, pass];
-                  appdata.settings['disableSyncFields'] = disableSync;
-                  appdata.implicitData['webdavAutoSync'] = autoSync;
-                  appdata.writeImplicitData();
+                      appdata.settings['webdav'] = [url.trim(), user, pass];
+                      appdata.settings['disableSyncFields'] = disableSync;
+                      appdata.implicitData['webdavAutoSync'] = autoSync;
+                      appdata.writeImplicitData();
 
-                  if (!autoSync) {
-                    appdata.saveData(false);
-                    context.showMessage(message: "Saved".tl);
-                    App.rootPop();
-                    return;
-                  }
-
-                  setState(() {
-                    isTesting = true;
-                  });
-                  var testResult = upload
-                      ? await DataSync().uploadData(force: true)
-                      : await DataSync().downloadData();
-                  if (testResult.error) {
-                    setState(() {
-                      isTesting = false;
-                    });
-                    appdata.settings['webdav'] = oldConfig;
-                    appdata.implicitData['webdavAutoSync'] = oldAutoSync;
-                    appdata.writeImplicitData();
-                    appdata.saveData(false);
-                    context.showMessage(message: testResult.errorMessage!);
-                    context.showMessage(message: "Saved Failed".tl);
-                  } else {
-                    appdata.saveData(false);
-                    context.showMessage(message: "Saved".tl);
-                    App.rootPop();
-                  }
-                },
-                child: Text("Continue".tl),
+                      setState(() {
+                        isTesting = true;
+                      });
+                      var testResult = upload
+                          ? await sync.uploadData(force: true)
+                          : await sync.downloadData();
+                      if (!mounted) return;
+                      if (testResult.error) {
+                        setState(() {
+                          isTesting = false;
+                        });
+                        appdata.settings['webdav'] = oldConfig;
+                        appdata.settings['disableSyncFields'] = oldDisableSync;
+                        appdata.implicitData['webdavAutoSync'] = oldAutoSync;
+                        appdata.writeImplicitData();
+                        appdata.saveData(false);
+                        context.showMessage(message: testResult.errorMessage!);
+                        context.showMessage(message: "Saved Failed".tl);
+                      } else {
+                        appdata.saveData(false);
+                        context.showMessage(message: "Saved".tl);
+                        App.rootPop();
+                      }
+                    },
+                    child: Text("Continue".tl),
+                  ),
+                ],
               ),
             ),
           ],

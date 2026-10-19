@@ -26,6 +26,8 @@ class ComicImage extends StatefulWidget {
     int? cacheHeight,
     this.onInit,
     this.onDispose,
+    this.onImageReady,
+    this.onImageSize,
   }) : image = ResizeImage.resizeIfNeeded(cacheWidth, cacheHeight, image),
        assert(cacheWidth == null || cacheWidth > 0),
        assert(cacheHeight == null || cacheHeight > 0);
@@ -65,6 +67,9 @@ class ComicImage extends StatefulWidget {
   final void Function(State<ComicImage> state)? onInit;
 
   final void Function(State<ComicImage> state)? onDispose;
+
+  final VoidCallback? onImageReady;
+  final ValueChanged<Size>? onImageSize;
 
   static void clear() => _ComicImageState.clear();
 
@@ -210,6 +215,10 @@ class _ComicImageState extends State<ComicImage> with WidgetsBindingObserver {
       _frameNumber = _frameNumber == null ? 0 : _frameNumber! + 1;
       _wasSynchronouslyLoaded = _wasSynchronouslyLoaded | synchronousCall;
     });
+    widget.onImageReady?.call();
+    widget.onImageSize?.call(
+      Size(imageInfo.image.width.toDouble(), imageInfo.image.height.toDouble()),
+    );
   }
 
   void _handleImageChunk(ImageChunkEvent event) {

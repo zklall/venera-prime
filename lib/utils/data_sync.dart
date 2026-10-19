@@ -1,21 +1,61 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
 import 'package:venera/components/components.dart';
 import 'package:venera/components/window_frame.dart';
 import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/appdata.dart';
+import 'package:venera/foundation/background_tasks.dart';
 import 'package:venera/foundation/comic_source/comic_source.dart';
 import 'package:venera/foundation/favorites.dart';
 import 'package:venera/foundation/log.dart';
 import 'package:venera/foundation/res.dart';
 import 'package:venera/network/app_dio.dart';
 import 'package:venera/utils/data.dart';
-import 'package:venera/utils/ext.dart';
 import 'package:webdav_client/webdav_client.dart' hide File;
+import 'package:webdav_client/webdav_client.dart' as webdav show File;
 import 'package:venera/utils/translations.dart';
 
 import 'io.dart';
+
+final _backupNamePattern = RegExp(r'^(\d+)-(\d+)(?:-(.+))?\.venera$');
+final _uniqueBackupNamePattern = RegExp(
+  r'^\d+-\d+-\d{20}-[0-9a-f]{32}\.venera$',
+);
+
+@visibleForTesting
+int compareBackupNames(String a, String b) {
+  final left = _backupNamePattern.firstMatch(a);
+  final right = _backupNamePattern.firstMatch(b);
+  if (left == null || right == null) {
+    if (left != null) return 1;
+    if (right != null) return -1;
+    return a.compareTo(b);
+  }
+  for (final group in [1, 2]) {
+    final result = BigInt.parse(
+      left[group]!,
+    ).compareTo(BigInt.parse(right[group]!));
+    if (result != 0) return result;
+  }
+  return (left[3] ?? '').compareTo(right[3] ?? '');
+}
+
+@visibleForTesting
+int nextBackupVersion(int currentVersion, Iterable<String> existingNames) {
+  var version = currentVersion;
+  for (final name in existingNames) {
+    final match = _backupNamePattern.firstMatch(name);
+    final remoteVersion = int.tryParse(match?[2] ?? '');
+    if (remoteVersion != null && remoteVersion > version) {
+      version = remoteVersion;
+    }
+  }
+  return version + 1;
+}
 
 @visibleForTesting
 List<String> backupFilesToPrune({
@@ -23,9 +63,16 @@ List<String> backupFilesToPrune({
   required String dayPrefix,
   required String uploadedFilename,
 }) {
-  final obsoleteForDay = existingNames
-      .where((name) => name.startsWith(dayPrefix) && name != uploadedFilename)
-      .toList();
+  final uploadedVersion = _backupNamePattern.firstMatch(uploadedFilename)?[2];
+  final obsoleteForDay = existingNames.where((name) {
+    final match = _backupNamePattern.firstMatch(name);
+    // Keep concurrent snapshots with the same counter and newer backups
+    // that another device may have published while this upload was running.
+    return name.startsWith(dayPrefix) &&
+        match != null &&
+        uploadedVersion != null &&
+        BigInt.parse(match[2]!) < BigInt.parse(uploadedVersion);
+  }).toList();
   final remainingFiles = existingNames
       .where(
         (name) => name != uploadedFilename && !obsoleteForDay.contains(name),
@@ -33,7 +80,7 @@ List<String> backupFilesToPrune({
       .toList();
   final excessCount = remainingFiles.length + 1 - 10;
   if (excessCount > 0) {
-    remainingFiles.sort();
+    remainingFiles.sort(compareBackupNames);
     obsoleteForDay.addAll(remainingFiles.take(excessCount));
   }
   return obsoleteForDay;
@@ -55,7 +102,7 @@ class DataSync with ChangeNotifier {
   }
 
   void onDataChanged() {
-    if (isEnabled) {
+    if (isEnabled && !_isRestoringBackup) {
       uploadData();
     }
   }
@@ -72,6 +119,7 @@ class DataSync with ChangeNotifier {
     showLoadingDialog(
       App.rootContext,
       cancelButtonText: "Shut Down".tl,
+      trackTask: false,
       onCancel: () => exit(0),
       barrierDismissible: false,
       message: "Uploading data...".tl,
@@ -87,6 +135,7 @@ class DataSync with ChangeNotifier {
   factory DataSync() => instance ?? (instance = DataSync._());
 
   bool _isDownloading = false;
+  bool _isRestoringBackup = false;
 
   bool get isDownloading => _isDownloading;
 
@@ -107,10 +156,11 @@ class DataSync with ChangeNotifier {
 
   String? get lastError => _lastError;
 
+  bool get isConfigured => _validateConfig()?.isNotEmpty == true;
+
   bool get isEnabled {
-    var config = appdata.settings['webdav'];
     var autoSync = appdata.implicitData['webdavAutoSync'] ?? false;
-    return autoSync && config is List && config.isNotEmpty;
+    return autoSync == true && isConfigured;
   }
 
   List<String>? _validateConfig() {
@@ -125,6 +175,27 @@ class DataSync with ChangeNotifier {
       return null;
     }
     return List.from(config);
+  }
+
+  String _targetKey(List<String> config) =>
+      sha256.convert(utf8.encode(jsonEncode(config))).toString();
+
+  String _remoteIdentity(webdav.File file) => jsonEncode([
+    file.name,
+    if (!_uniqueBackupNamePattern.hasMatch(file.name!)) ...[
+      file.eTag,
+      file.mTime?.toUtc().toIso8601String(),
+      file.size,
+    ],
+  ]);
+
+  void _rememberBackup(List<String> config, String name, String identity) {
+    appdata.implicitData['webdavLastBackup'] = {
+      'target': _targetKey(config),
+      'name': name,
+      'identity': identity,
+    };
+    appdata.writeImplicitData();
   }
 
   Future<Res<bool>> uploadData({bool force = false}) {
@@ -167,6 +238,11 @@ class DataSync with ChangeNotifier {
   Future<Res<bool>> _uploadDataNow() async {
     _isUploading = true;
     _lastError = null;
+    final task = BackgroundTasks.instance.start(
+      'webdav-upload',
+      'WebDAV upload',
+    );
+    task.update(completed: 0, total: 3, message: 'Preparing backup');
     notifyListeners();
     try {
       var config = _validateConfig();
@@ -175,6 +251,7 @@ class DataSync with ChangeNotifier {
         return const Res.error('Invalid WebDAV configuration');
       }
       if (config.isEmpty) {
+        task.update(message: 'WebDAV is not configured');
         return const Res(true);
       }
       String url = config[0];
@@ -189,20 +266,37 @@ class DataSync with ChangeNotifier {
       );
 
       File? backupFile;
+      final previousVersion = appdata.settings['dataVersion'] as int;
+      int? uploadingVersion;
+      var uploaded = false;
       try {
-        appdata.settings['dataVersion']++;
+        var files = await client.readDir('/');
+        files = files
+            .where(
+              (e) => e.isDir != true && e.name?.endsWith('.venera') == true,
+            )
+            .toList();
+        uploadingVersion = nextBackupVersion(
+          previousVersion,
+          files.map((file) => file.name!),
+        );
+        appdata.settings['dataVersion'] = uploadingVersion;
         await appdata.saveData(false);
         var data = await exportAppData(true);
         backupFile = data;
+        task.update(completed: 1, message: 'Uploading backup');
         var time = (DateTime.now().millisecondsSinceEpoch ~/ 86400000)
             .toString();
         var filename = time;
         filename += '-';
         filename += appdata.settings['dataVersion'].toString();
-        filename += '.venera';
-        var files = await client.readDir('/');
-        files = files.where((e) => e.name!.endsWith('.venera')).toList();
+        filename +=
+            '-${DateTime.now().microsecondsSinceEpoch.toString().padLeft(20, '0')}';
+        filename += '-${const Uuid().v4().replaceAll('-', '')}.venera';
         await client.write(filename, await data.readAsBytes());
+        uploaded = true;
+        _rememberBackup(config, filename, jsonEncode([filename]));
+        task.update(completed: 2, message: 'Cleaning old backups');
         Log.info("Upload Data", "Data uploaded successfully");
         // Keep the previous backup until the new remote file is safely written.
         try {
@@ -215,21 +309,37 @@ class DataSync with ChangeNotifier {
             await client.remove(name);
           }
         } catch (e, s) {
+          task.addError('Uploaded backup but failed to prune old backups: $e');
           Log.error(
             "Upload Data",
             "Uploaded backup but failed to prune old backups: $e",
             s,
           );
         }
+        task.update(completed: 3, message: 'Backup uploaded');
         return const Res(true);
       } catch (e, s) {
         Log.error("Upload Data", e, s);
         _lastError = e.toString();
         return Res.error(e.toString());
       } finally {
+        if (!uploaded &&
+            uploadingVersion != null &&
+            appdata.settings['dataVersion'] == uploadingVersion) {
+          appdata.settings['dataVersion'] = previousVersion;
+          await appdata.saveData(false);
+        }
         await backupFile?.deleteIgnoreError();
       }
+    } catch (error) {
+      task.fail(error);
+      rethrow;
     } finally {
+      if (_lastError != null) {
+        task.fail(_lastError!);
+      } else {
+        task.finish();
+      }
       _isUploading = false;
       notifyListeners();
     }
@@ -244,6 +354,11 @@ class DataSync with ChangeNotifier {
     _haveWaitingTask = false;
     _isDownloading = true;
     _lastError = null;
+    final task = BackgroundTasks.instance.start(
+      'webdav-download',
+      'WebDAV download',
+    );
+    task.update(completed: 0, total: 3, message: 'Checking remote backups');
     notifyListeners();
     try {
       var config = _validateConfig();
@@ -252,6 +367,7 @@ class DataSync with ChangeNotifier {
         return const Res.error('Invalid WebDAV configuration');
       }
       if (config.isEmpty) {
+        task.update(message: 'WebDAV is not configured');
         return const Res(true);
       }
       String url = config[0];
@@ -268,24 +384,34 @@ class DataSync with ChangeNotifier {
       Directory? downloadDirectory;
       try {
         var files = await client.readDir('/');
-        files.sort((a, b) => b.name!.compareTo(a.name!));
-        var file = files.firstWhereOrNull((e) => e.name!.endsWith('.venera'));
+        files = files
+            .where(
+              (e) => e.isDir != true && e.name?.endsWith('.venera') == true,
+            )
+            .toList();
+        files.sort((a, b) => compareBackupNames(b.name!, a.name!));
+        var file = files.firstOrNull;
         if (file == null) {
           throw 'No data file found';
         }
-        var version = file.name!
-            .split('-')
-            .elementAtOrNull(1)
-            ?.split('.')
-            .first;
-        if (version != null && int.tryParse(version) != null) {
-          var currentVersion = appdata.settings['dataVersion'];
-          if (currentVersion != null && int.parse(version) <= currentVersion) {
+        final identity = _remoteIdentity(file);
+        final hasStableIdentity =
+            _uniqueBackupNamePattern.hasMatch(file.name!) ||
+            file.eTag?.isNotEmpty == true ||
+            file.mTime != null;
+        final lastBackup = appdata.implicitData['webdavLastBackup'];
+        if (lastBackup is Map && lastBackup['target'] == _targetKey(config)) {
+          final lastName = lastBackup['name'];
+          if ((hasStableIdentity && lastBackup['identity'] == identity) ||
+              (lastName is String &&
+                  compareBackupNames(file.name!, lastName) < 0)) {
             Log.info("Data Sync", 'No new data to download');
+            task.update(completed: 3, message: 'No new data to download');
             return const Res(true);
           }
         }
         Log.info("Data Sync", "Downloading data from WebDAV server");
+        task.update(completed: 1, message: 'Downloading backup');
         downloadDirectory = await Directory(
           App.cachePath,
         ).createTemp('webdav-');
@@ -293,7 +419,24 @@ class DataSync with ChangeNotifier {
           FilePath.join(downloadDirectory.path, 'backup.venera'),
         );
         await client.read2File(file.name!, localFile.path);
-        await importAppData(localFile, true);
+        task.update(completed: 2, message: 'Restoring backup');
+        // Opening the restored databases emits change notifications. They are
+        // remote changes, so must not immediately publish the backup again.
+        _isRestoringBackup = true;
+        late List<String> skippedSources;
+        try {
+          skippedSources = await importAppData(localFile, sync: true);
+        } finally {
+          _isRestoringBackup = false;
+        }
+        _rememberBackup(config, file.name!, identity);
+        task.update(
+          completed: 3,
+          message: skippedSources.isEmpty
+              ? 'Backup restored'
+              : 'Backup restored. Skipped empty source scripts: @files'
+                    .tlParams({'files': skippedSources.join('\n')}),
+        );
         Log.info("Data Sync", "Data downloaded successfully");
         return const Res(true);
       } catch (e, s) {
@@ -303,7 +446,15 @@ class DataSync with ChangeNotifier {
       } finally {
         await downloadDirectory?.deleteIgnoreError(recursive: true);
       }
+    } catch (error) {
+      task.fail(error);
+      rethrow;
     } finally {
+      if (_lastError != null) {
+        task.fail(_lastError!);
+      } else {
+        task.finish();
+      }
       _isDownloading = false;
       notifyListeners();
     }
