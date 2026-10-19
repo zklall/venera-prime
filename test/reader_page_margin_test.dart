@@ -40,7 +40,9 @@ Future<void> settle(WidgetTester tester) async {
   }
 }
 
-Future<dynamic> openReader(WidgetTester tester, String mode, {
+Future<dynamic> openReader(
+  WidgetTester tester,
+  String mode, {
   Map<int, Size> imageSizes = const {},
 }) async {
   tester.view.physicalSize = const Size(1000, 600);
@@ -116,9 +118,14 @@ Future<dynamic> openReader(WidgetTester tester, String mode, {
         File('${dir.path}/$i.png').writeAsBytesSync(bytes);
       } else {
         final recorder = ui.PictureRecorder();
-        Canvas(recorder).drawRect(Offset.zero & size, Paint()..color = Colors.orange);
+        Canvas(
+          recorder,
+        ).drawRect(Offset.zero & size, Paint()..color = Colors.orange);
         final picture = recorder.endRecording();
-        final image = await picture.toImage(size.width.toInt(), size.height.toInt());
+        final image = await picture.toImage(
+          size.width.toInt(),
+          size.height.toInt(),
+        );
         final data = (await image.toByteData(format: ui.ImageByteFormat.png))!;
         File('${dir.path}/$i.png').writeAsBytesSync(data.buffer.asUint8List());
         image.dispose();
@@ -628,4 +635,3 @@ void main() {
     },
   );
 }
-

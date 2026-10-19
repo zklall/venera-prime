@@ -216,9 +216,9 @@ class _ComicImageState extends State<ComicImage> with WidgetsBindingObserver {
       _wasSynchronouslyLoaded = _wasSynchronouslyLoaded | synchronousCall;
     });
     widget.onImageReady?.call();
-    widget.onImageSize?.call(Size(
-      imageInfo.image.width.toDouble(), imageInfo.image.height.toDouble(),
-    ));
+    widget.onImageSize?.call(
+      Size(imageInfo.image.width.toDouble(), imageInfo.image.height.toDouble()),
+    );
   }
 
   void _handleImageChunk(ImageChunkEvent event) {
@@ -479,4 +479,3 @@ class _ComicImageState extends State<ComicImage> with WidgetsBindingObserver {
     );
   }
 }
-

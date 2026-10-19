@@ -187,7 +187,8 @@ class _GalleryModeState extends State<_GalleryMode>
   void _queueSpreadSize(int index, Size size) {
     if (!mounted) return;
     if (reader.spreadImageSizes[index] == size ||
-        _pendingSpreadSizes[index] == size) return;
+        _pendingSpreadSizes[index] == size)
+      return;
     _pendingSpreadSizes[index] = size;
     if (_spreadSizeUpdateScheduled) return;
     _spreadSizeUpdateScheduled = true;
@@ -198,7 +199,10 @@ class _GalleryModeState extends State<_GalleryMode>
     if (!mounted) return;
     if (reader.isPageAnimating) {
       _spreadSizeRetry?.cancel();
-      _spreadSizeRetry = Timer(const Duration(milliseconds: 50), _flushSpreadSizes);
+      _spreadSizeRetry = Timer(
+        const Duration(milliseconds: 50),
+        _flushSpreadSizes,
+      );
       return;
     }
     _spreadSizeUpdateScheduled = false;
@@ -318,19 +322,22 @@ class _GalleryModeState extends State<_GalleryMode>
 
   void _precacheSpreadImage(int index) {
     if (_spreadMetadataStreams.containsKey(index)) return;
-    final stream = _createImageProvider(index + 1, context).resolve(
-      createLocalImageConfiguration(context),
-    );
+    final stream = _createImageProvider(
+      index + 1,
+      context,
+    ).resolve(createLocalImageConfiguration(context));
     late final ImageStreamListener listener;
     void release() {
       if (_spreadMetadataStreams[index]?.$2 != listener) return;
       stream.removeListener(listener);
       _spreadMetadataStreams.remove(index);
     }
+
     listener = ImageStreamListener((info, synchronous) {
-      _queueSpreadSize(index, Size(
-        info.image.width.toDouble(), info.image.height.toDouble(),
-      ));
+      _queueSpreadSize(
+        index,
+        Size(info.image.width.toDouble(), info.image.height.toDouble()),
+      );
       // Match precacheImage's ownership and keep it alive through this frame.
       SchedulerBinding.instance.addPostFrameCallback((_) {
         info.dispose();
@@ -605,7 +612,9 @@ class _GalleryModeState extends State<_GalleryMode>
         : Row(children: children);
   }
 
-  Widget _buildBookSpread(List<String> images, int startIndex, {
+  Widget _buildBookSpread(
+    List<String> images,
+    int startIndex, {
     required bool singleCover,
   }) {
     var slots = List<int?>.generate(images.length, (i) => i);
@@ -616,32 +625,43 @@ class _GalleryModeState extends State<_GalleryMode>
     if (reader.mode == ReaderMode.galleryRightToLeft) {
       slots = slots.reversed.toList();
     }
-    return LayoutBuilder(builder: (context, constraints) {
-      final rects = readerSpreadRects(constraints.biggest, [
-        for (final slot in slots)
-          slot == null ? null : reader.spreadImageSizes[startIndex + slot],
-      ]);
-      return Stack(children: [
-        for (var i = 0; i < rects.length; i++)
-          Positioned.fromRect(
-            rect: rects[i],
-            child: slots[i] == null
-                ? const SizedBox.expand(key: ValueKey('reader-spread-blank'))
-                : ComicImage(
-                    key: ValueKey('reader-spread-image-${startIndex + slots[i]! + 1}'),
-                    image: _createImageProviderFromKey(
-                      images[slots[i]!], context, startIndex + slots[i]! + 1,
-                    ),
-                    width: rects[i].width,
-                    height: rects[i].height,
-                    fit: BoxFit.contain,
-                    onImageSize: (size) => _queueSpreadSize(startIndex + slots[i]!, size),
-                    onInit: imageStates.add,
-                    onDispose: imageStates.remove,
-                  ),
-          ),
-      ]);
-    });
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final rects = readerSpreadRects(constraints.biggest, [
+          for (final slot in slots)
+            slot == null ? null : reader.spreadImageSizes[startIndex + slot],
+        ]);
+        return Stack(
+          children: [
+            for (var i = 0; i < rects.length; i++)
+              Positioned.fromRect(
+                rect: rects[i],
+                child: slots[i] == null
+                    ? const SizedBox.expand(
+                        key: ValueKey('reader-spread-blank'),
+                      )
+                    : ComicImage(
+                        key: ValueKey(
+                          'reader-spread-image-${startIndex + slots[i]! + 1}',
+                        ),
+                        image: _createImageProviderFromKey(
+                          images[slots[i]!],
+                          context,
+                          startIndex + slots[i]! + 1,
+                        ),
+                        width: rects[i].width,
+                        height: rects[i].height,
+                        fit: BoxFit.contain,
+                        onImageSize: (size) =>
+                            _queueSpreadSize(startIndex + slots[i]!, size),
+                        onInit: imageStates.add,
+                        onDispose: imageStates.remove,
+                      ),
+              ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -680,16 +700,20 @@ class _GalleryModeState extends State<_GalleryMode>
         for (final imageState in imageStates) {
           final key = imageState.widget.key;
           if (key != ValueKey('reader-spread-image-${start + 1}') &&
-              key != ValueKey('reader-spread-image-${end}')) continue;
+              key != ValueKey('reader-spread-image-${end}'))
+            continue;
           final box = imageState.context.findRenderObject();
           if (box is! RenderBox || !box.hasSize) continue;
           final origin = box.localToGlobal(Offset.zero);
           final globalRect = origin & box.size;
           if (!globalRect.contains(location)) continue;
           final center = viewport.globalToLocal(globalRect.center);
-          final target = initial * (viewport.size.width / box.size.width).clamp(1.0, 4.0);
-          controller.animateScale?.call(target,
-            (viewport.size.center(Offset.zero) - center) * (target / initial));
+          final target =
+              initial * (viewport.size.width / box.size.width).clamp(1.0, 4.0);
+          controller.animateScale?.call(
+            target,
+            (viewport.size.center(Offset.zero) - center) * (target / initial),
+          );
           return;
         }
       }
@@ -1853,4 +1877,3 @@ class _ProgressPainter extends CustomPainter {
         oldDelegate.color != color;
   }
 }
-

@@ -491,8 +491,9 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
             );
             return [
               if (end - start == 2)
-                PopupMenuItem(
+                CheckedPopupMenuItem<String>(
                   value: 'pair',
+                  checked: this.context.reader.joinedSpreadPairs.contains(start),
                   child: Text('Keep these pages as a spread'.tl),
                 ),
               if (end - start == 1) ...[
@@ -1413,4 +1414,3 @@ class _SelectImageOverlayContentState
     );
   }
 }
-

@@ -4,30 +4,45 @@ import 'package:venera/utils/reader_page_layout.dart';
 void main() {
   test('wide images break pairs without skipping adjacent pages', () {
     final layout = ReaderPageLayout(
-      imageCount: 9, imagesPerPage: 2, singleCover: false,
+      imageCount: 9,
+      imagesPerPage: 2,
+      singleCover: false,
       standaloneImages: {1, 2, 6},
     );
-    expect([for (var p = 1; p <= layout.pageCount; p++) layout.range(p)],
-      [(0, 1), (1, 2), (2, 3), (3, 5), (5, 6), (6, 7), (7, 9)]);
+    expect(
+      [for (var p = 1; p <= layout.pageCount; p++) layout.range(p)],
+      [(0, 1), (1, 2), (2, 3), (3, 5), (5, 6), (6, 7), (7, 9)],
+    );
     for (var image = 1; image <= 9; image++) {
       final (start, end) = layout.range(layout.pageForImage(image));
       expect(image - 1, inInclusiveRange(start, end - 1));
     }
   });
 
-  test('explicit cross-page pairs override width detection and cover parity', () {
-    final layout = ReaderPageLayout(
-      imageCount: 7, imagesPerPage: 2, singleCover: true,
-      standaloneImages: {0, 2, 3}, joinedPairs: {0, 2},
-    );
-    expect([for (var p = 1; p <= layout.pageCount; p++) layout.range(p)],
-      [(0, 2), (2, 4), (4, 6), (6, 7)]);
-  });
+  test(
+    'explicit cross-page pairs override width detection and cover parity',
+    () {
+      final layout = ReaderPageLayout(
+        imageCount: 7,
+        imagesPerPage: 2,
+        singleCover: true,
+        standaloneImages: {0, 2, 3},
+        joinedPairs: {0, 2},
+      );
+      expect(
+        [for (var p = 1; p <= layout.pageCount; p++) layout.range(p)],
+        [(0, 2), (2, 4), (4, 6), (6, 7)],
+      );
+    },
+  );
 
   test('manual shift makes a boundary after native spreads', () {
     final layout = ReaderPageLayout(
-      imageCount: 8, imagesPerPage: 2, singleCover: false,
-      standaloneImages: {1}, anchor: 5,
+      imageCount: 8,
+      imagesPerPage: 2,
+      singleCover: false,
+      standaloneImages: {1},
+      anchor: 5,
     );
     expect(layout.range(layout.pageForImage(6)), (5, 7));
   });
@@ -39,7 +54,7 @@ void main() {
           final layout = ReaderPageLayout(
             imageCount: count, imagesPerPage: 2, singleCover: cover,
             standaloneImages: {for (var i = 0; i < count; i++)
-              if (mask & (1 << i) != 0) i},
+              if ((mask & (1 << i)) != 0) i},
           );
           final indices = <int>[];
           for (var p = 1; p <= layout.pageCount; p++) {
@@ -88,4 +103,3 @@ void main() {
     }
   });
 }
-

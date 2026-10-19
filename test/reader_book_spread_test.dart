@@ -15,6 +15,12 @@ class _NoDataSync extends Fake implements DataSync {
   Future<Res<bool>> uploadData({bool force = false}) async => const Res(true);
 }
 
+Future<void> closeReader(WidgetTester tester) async {
+  await tester.pumpWidget(const SizedBox());
+  await tester.pump(const Duration(seconds: 2));
+  await fixture.settle(tester);
+}
+
 void main() {
   late DataSync? previousSync;
   setUp(() {
@@ -52,10 +58,11 @@ void main() {
     await fixture.settle(tester);
     expect(state.page, 11);
     expect(tester.takeException(), isNull);
+    await closeReader(tester);
   });
 
   testWidgets('manual cross-page marking persists and can be reset', (tester) async {
-    final dynamic state = await fixture.openReader(tester, 'galleryLeftToRight');
+    dynamic state = await fixture.openReader(tester, 'galleryLeftToRight');
     appdata.settings['readerTwoPageSpread'] = true;
     state.update();
     await fixture.settle(tester);
@@ -63,6 +70,12 @@ void main() {
     await fixture.settle(tester);
     final saved = appdata.settings['readerSpreadOverrides'] as Map;
     expect(saved.values.single, {'8': 'pair'});
+    final root = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    await closeReader(tester);
+    await tester.pumpWidget(root);
+    await fixture.settle(tester);
+    state = tester.state(find.byType(Reader));
+    expect(state.joinedSpreadPairs, {8});
     state.shiftImage(1);
     await fixture.settle(tester);
     expect(state.imageLayout.range(state.page), (8, 10));
@@ -70,29 +83,64 @@ void main() {
     await fixture.settle(tester);
     expect(appdata.settings['readerSpreadOverrides'], isEmpty);
     expect(tester.takeException(), isNull);
+    await closeReader(tester);
   });
 
-  testWidgets('double tap focuses the selected page and returns to the spread',
+  testWidgets('reset removes a forced-page override inside a regrouped pair',
       (tester) async {
-    final dynamic state = await fixture.openReader(tester, 'galleryRightToLeft');
+    final dynamic state = await fixture.openReader(tester, 'galleryLeftToRight',
+      imageSizes: {10: const Size(1200, 600)});
     appdata.settings['readerTwoPageSpread'] = true;
     state.update();
     await fixture.settle(tester);
-    final gallery = tester.widget<PhotoViewGallery>(find.byType(PhotoViewGallery));
-    final options = gallery.builder!(tester.element(find.byType(PhotoViewGallery)), state.page as int);
-    final controller = options.controller!;
-    final initial = controller.getInitialScale!.call()!;
-    final target = tester.getRect(find.byKey(const ValueKey('reader-spread-image-9'))).center;
-    await tester.tapAt(target);
-    await tester.pump(const Duration(milliseconds: 60));
-    await tester.tapAt(target);
+    state.toPage(state.imageLayout.pageForImage(10), animate: false);
     await fixture.settle(tester);
-    expect(controller.scale, greaterThan(initial * 1.2));
-    await tester.tapAt(target);
-    await tester.pump(const Duration(milliseconds: 60));
-    await tester.tapAt(target);
+    expect(state.imageLayout.range(state.page), (9, 10));
+    state.setSpreadOverride('page');
     await fixture.settle(tester);
-    expect(controller.scale, closeTo(initial, .01));
+    expect(state.imageLayout.range(state.page), (8, 10));
+    state.setSpreadOverride(null);
+    await fixture.settle(tester);
+    expect(state.imageLayout.range(state.imageLayout.pageForImage(10)), (9, 10));
+    expect(appdata.settings['readerSpreadOverrides'], isEmpty);
     expect(tester.takeException(), isNull);
+    await closeReader(tester);
   });
+
+  testWidgets(
+    'double tap focuses the selected page and returns to the spread',
+    (tester) async {
+      final dynamic state = await fixture.openReader(
+        tester,
+        'galleryRightToLeft',
+      );
+      appdata.settings['readerTwoPageSpread'] = true;
+      state.update();
+      await fixture.settle(tester);
+      final gallery = tester.widget<PhotoViewGallery>(
+        find.byType(PhotoViewGallery),
+      );
+      final options = gallery.builder!(
+        tester.element(find.byType(PhotoViewGallery)),
+        state.page as int,
+      );
+      final controller = options.controller!;
+      final initial = controller.getInitialScale!.call()!;
+      final target = tester
+          .getRect(find.byKey(const ValueKey('reader-spread-image-9')))
+          .center;
+      await tester.tapAt(target);
+      await tester.pump(const Duration(milliseconds: 60));
+      await tester.tapAt(target);
+      await fixture.settle(tester);
+      expect(controller.scale, greaterThan(initial * 1.2));
+      await tester.tapAt(target);
+      await tester.pump(const Duration(milliseconds: 60));
+      await tester.tapAt(target);
+      await fixture.settle(tester);
+      expect(controller.scale, closeTo(initial, .01));
+      expect(tester.takeException(), isNull);
+      await closeReader(tester);
+    },
+  );
 }

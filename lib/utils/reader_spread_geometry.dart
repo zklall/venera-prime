@@ -2,23 +2,39 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 /// Wide artwork benefits from the full viewport regardless of its semantics.
-bool isWideReaderImage(Size size) => size.width.isFinite &&
-    size.height.isFinite && size.height > 0 &&
+bool isWideReaderImage(Size size) =>
+    size.width.isFinite &&
+    size.height.isFinite &&
+    size.height > 0 &&
     size.width / size.height >= 1.2;
 
 /// A spread has one page height. Images retain their own aspect ratios.
 /// Null slots reserve a matching paper-sized blank for the cover or last page.
 List<Rect> readerSpreadRects(Size viewport, List<Size?> pages) {
-  if (pages.isEmpty || viewport.isEmpty ||
-      !viewport.width.isFinite || !viewport.height.isFinite) return [];
-  final known = pages.whereType<Size>().where(
-    (size) => size.width > 0 && size.height > 0 &&
-        size.width.isFinite && size.height.isFinite,
-  ).toList();
+  if (pages.isEmpty ||
+      viewport.isEmpty ||
+      !viewport.width.isFinite ||
+      !viewport.height.isFinite) {
+    return [];
+  }
+  final known = pages
+      .whereType<Size>()
+      .where(
+        (size) =>
+            size.width > 0 &&
+            size.height > 0 &&
+            size.width.isFinite &&
+            size.height.isFinite,
+      )
+      .toList();
   final fallback = known.isEmpty ? const Size(2, 3) : known.first;
   final ratios = pages.map((size) {
-    final valid = size != null && size.width > 0 && size.height > 0 &&
-        size.width.isFinite && size.height.isFinite;
+    final valid =
+        size != null &&
+        size.width > 0 &&
+        size.height > 0 &&
+        size.width.isFinite &&
+        size.height.isFinite;
     return valid ? size.width / size.height : fallback.width / fallback.height;
   }).toList();
   final totalRatio = ratios.fold<double>(0, (sum, ratio) => sum + ratio);

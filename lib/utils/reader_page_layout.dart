@@ -22,7 +22,8 @@ class ReaderPageLayout {
   /// A manually shifted image must start a screen even after a wide image.
   final int? anchor;
 
-  bool get _hasSpreads => imagesPerPage == 2 &&
+  bool get _hasSpreads =>
+      imagesPerPage == 2 &&
       (standaloneImages.isNotEmpty || joinedPairs.isNotEmpty || anchor != null);
 
   late final List<(int, int)> _spreads = _buildSpreads();
@@ -33,8 +34,10 @@ class ReaderPageLayout {
       var count = 1;
       if (start + 1 < imageCount) {
         final explicitPair = joinedPairs.contains(start);
-        final nextStartsGroup = standaloneImages.contains(start + 1) ||
-            joinedPairs.contains(start + 1) || anchor == start + 1;
+        final nextStartsGroup =
+            standaloneImages.contains(start + 1) ||
+            joinedPairs.contains(start + 1) ||
+            anchor == start + 1;
         if (explicitPair ||
             (!standaloneImages.contains(start) &&
                 !(start == 0 && firstPageCount == 1) &&
@@ -55,8 +58,8 @@ class ReaderPageLayout {
   int get pageCount => _hasSpreads
       ? (_spreads.isEmpty ? 1 : _spreads.length)
       : 1 +
-      ((imageCount - firstPageCount).clamp(0, imageCount) / imagesPerPage)
-          .ceil();
+            ((imageCount - firstPageCount).clamp(0, imageCount) / imagesPerPage)
+                .ceil();
 
   (int, int) range(int page) {
     if (_hasSpreads) {
@@ -94,4 +97,3 @@ class ReaderPageLayout {
       ? 0
       : (start - (singleCover ? 1 : imagesPerPage)) % imagesPerPage;
 }
-

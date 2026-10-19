@@ -276,7 +276,9 @@ class _ReaderState extends State<Reader>
       for (final entry in chapterSettings.entries) {
         final index = int.tryParse(entry.key.toString());
         final kind = entry.value;
-        if (index != null && index >= 0 && index < images!.length &&
+        if (index != null &&
+            index >= 0 &&
+            index < images!.length &&
             (kind == 'pair' || kind == 'spread' || kind == 'page')) {
           _spreadOverrides[index] = kind as String;
         }
@@ -310,10 +312,18 @@ class _ReaderState extends State<Reader>
     if (!twoPageSpread || !canShiftImages) return;
     final (start, end) = imageLayout.range(page);
     if (kind == 'pair' && end - start != 2) return;
+    if ((kind == 'page' || kind == 'spread') && end - start != 1) return;
     if (kind != null && kind != 'pair' && kind != 'page' && kind != 'spread') {
       return;
     }
-    _spreadOverrides.remove(start);
+    if (kind == null) {
+      // A forced single-page override may now be the second image of a pair.
+      for (var index = start; index < end; index++) {
+        _spreadOverrides.remove(index);
+      }
+    } else {
+      _spreadOverrides.remove(start);
+    }
     if (kind == 'pair') {
       if (_spreadOverrides[start - 1] == 'pair') {
         _spreadOverrides.remove(start - 1);
@@ -322,8 +332,9 @@ class _ReaderState extends State<Reader>
     }
     if (kind != null) _spreadOverrides[start] = kind;
     final saved = appdata.settings['readerSpreadOverrides'];
-    final all = saved is Map ? Map<String, dynamic>.from(saved) :
-        <String, dynamic>{};
+    final all = saved is Map
+        ? Map<String, dynamic>.from(saved)
+        : <String, dynamic>{};
     if (_spreadOverrides.isEmpty) {
       all.remove(_spreadSettingsKey);
     } else {
@@ -739,16 +750,26 @@ abstract mixin class _ImagePerPageHandler {
       );
 
   ReaderPageLayout get imageLayout {
-    final key = (images, imagesPerPage, showSingleImageOnFirstPage(),
-        imageGroupingOffset, imageGroupingAnchor, twoPageSpread,
-        spreadLayoutRevision);
+    final key = (
+      images,
+      imagesPerPage,
+      showSingleImageOnFirstPage(),
+      imageGroupingOffset,
+      imageGroupingAnchor,
+      twoPageSpread,
+      spreadLayoutRevision,
+    );
     if (key != _imageLayoutKey) {
       _imageLayoutKey = key;
-      _cachedImageLayout = _layoutFor(imagesPerPage,
-          showSingleImageOnFirstPage(), twoPageSpread);
+      _cachedImageLayout = _layoutFor(
+        imagesPerPage,
+        showSingleImageOnFirstPage(),
+        twoPageSpread,
+      );
     }
     return _cachedImageLayout!;
   }
+
   late int _lastImagesPerPage;
 
   late bool _lastOrientation;
@@ -834,8 +855,11 @@ abstract mixin class _ImagePerPageHandler {
 
   /// Calculate maxPage with a specific imagesPerPage value
   int _calcMaxPage(int imagesPerPageValue, bool singleImageOnFirstPage) {
-    return _layoutFor(imagesPerPageValue, singleImageOnFirstPage,
-        _lastTwoPageSpread).pageCount;
+    return _layoutFor(
+      imagesPerPageValue,
+      singleImageOnFirstPage,
+      _lastTwoPageSpread,
+    ).pageCount;
   }
 
   /// Check if the number of images per page has changed
@@ -872,8 +896,11 @@ abstract mixin class _ImagePerPageHandler {
     int newImagesPerPage,
   ) {
     final previousImageIndex =
-        _layoutFor(oldImagesPerPage, _lastSingleImageOnFirstPage,
-            _lastTwoPageSpread).range(page).$1 +
+        _layoutFor(
+          oldImagesPerPage,
+          _lastSingleImageOnFirstPage,
+          _lastTwoPageSpread,
+        ).range(page).$1 +
         1;
     if (oldImagesPerPage != newImagesPerPage ||
         _lastTwoPageSpread != twoPageSpread ||
@@ -1169,4 +1196,3 @@ abstract interface class _ImageViewController {
 
   String? getImageKeyByOffset(Offset offset);
 }
-
