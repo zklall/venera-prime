@@ -29,39 +29,49 @@ void main() {
   });
   tearDown(() => DataSync.instance = previousSync);
 
-  testWidgets('book spreads align uneven pages, isolate wide images and retain progress',
-      (tester) async {
-    final dynamic state = await fixture.openReader(tester, 'galleryLeftToRight',
-      imageSizes: {9: const Size(300, 600), 10: const Size(510, 600),
-        11: const Size(1200, 600)});
-    appdata.settings['readerTwoPageSpread'] = true;
-    state.update();
-    await fixture.settle(tester);
-    Finder image(int n) => find.byKey(ValueKey('reader-spread-image-$n'));
-    final left = tester.getRect(image(9));
-    final right = tester.getRect(image(10));
-    expect(left.height, closeTo(right.height, 1));
-    expect(left.top, closeTo(right.top, 1));
-    expect(left.right, closeTo(right.left, 1));
-    expect(left.width / left.height, closeTo(.5, .01));
-    expect(right.width / right.height, closeTo(.85, .01));
+  testWidgets(
+    'book spreads align uneven pages, isolate wide images and retain progress',
+    (tester) async {
+      final dynamic state = await fixture.openReader(
+        tester,
+        'galleryLeftToRight',
+        imageSizes: {
+          9: const Size(300, 600),
+          10: const Size(510, 600),
+          11: const Size(1200, 600),
+        },
+      );
+      appdata.settings['readerTwoPageSpread'] = true;
+      state.update();
+      await fixture.settle(tester);
+      Finder image(int n) => find.byKey(ValueKey('reader-spread-image-$n'));
+      final left = tester.getRect(image(9));
+      final right = tester.getRect(image(10));
+      expect(left.height, closeTo(right.height, 1));
+      expect(left.top, closeTo(right.top, 1));
+      expect(left.right, closeTo(right.left, 1));
+      expect(left.width / left.height, closeTo(.5, .01));
+      expect(right.width / right.height, closeTo(.85, .01));
 
-    state.toPage(state.imageLayout.pageForImage(11), animate: false);
-    await fixture.settle(tester);
-    expect(state.imageLayout.range(state.page), (10, 11));
-    expect(tester.getSize(image(11)).width, greaterThan(right.width));
-    tester.view.physicalSize = const Size(600, 1000);
-    await fixture.settle(tester);
-    expect(state.imageLayout.range(state.page), (10, 11));
-    appdata.settings['readerTwoPageSpread'] = false;
-    state.update();
-    await fixture.settle(tester);
-    expect(state.page, 11);
-    expect(tester.takeException(), isNull);
-    await closeReader(tester);
-  });
+      state.toPage(state.imageLayout.pageForImage(11), animate: false);
+      await fixture.settle(tester);
+      expect(state.imageLayout.range(state.page), (10, 11));
+      expect(tester.getSize(image(11)).width, greaterThan(right.width));
+      tester.view.physicalSize = const Size(600, 1000);
+      await fixture.settle(tester);
+      expect(state.imageLayout.range(state.page), (10, 11));
+      appdata.settings['readerTwoPageSpread'] = false;
+      state.update();
+      await fixture.settle(tester);
+      expect(state.page, 11);
+      expect(tester.takeException(), isNull);
+      await closeReader(tester);
+    },
+  );
 
-  testWidgets('manual cross-page marking persists and can be reset', (tester) async {
+  testWidgets('manual cross-page marking persists and can be reset', (
+    tester,
+  ) async {
     dynamic state = await fixture.openReader(tester, 'galleryLeftToRight');
     appdata.settings['readerTwoPageSpread'] = true;
     state.update();
@@ -86,10 +96,14 @@ void main() {
     await closeReader(tester);
   });
 
-  testWidgets('reset removes a forced-page override inside a regrouped pair',
-      (tester) async {
-    final dynamic state = await fixture.openReader(tester, 'galleryLeftToRight',
-      imageSizes: {10: const Size(1200, 600)});
+  testWidgets('reset removes a forced-page override inside a regrouped pair', (
+    tester,
+  ) async {
+    final dynamic state = await fixture.openReader(
+      tester,
+      'galleryLeftToRight',
+      imageSizes: {10: const Size(1200, 600)},
+    );
     appdata.settings['readerTwoPageSpread'] = true;
     state.update();
     await fixture.settle(tester);
@@ -101,7 +115,10 @@ void main() {
     expect(state.imageLayout.range(state.page), (8, 10));
     state.setSpreadOverride(null);
     await fixture.settle(tester);
-    expect(state.imageLayout.range(state.imageLayout.pageForImage(10)), (9, 10));
+    expect(state.imageLayout.range(state.imageLayout.pageForImage(10)), (
+      9,
+      10,
+    ));
     expect(appdata.settings['readerSpreadOverrides'], isEmpty);
     expect(tester.takeException(), isNull);
     await closeReader(tester);

@@ -52,9 +52,13 @@ void main() {
       for (var mask = 0; mask < 1 << count; mask++) {
         for (final cover in [false, true]) {
           final layout = ReaderPageLayout(
-            imageCount: count, imagesPerPage: 2, singleCover: cover,
-            standaloneImages: {for (var i = 0; i < count; i++)
-              if ((mask & (1 << i)) != 0) i},
+            imageCount: count,
+            imagesPerPage: 2,
+            singleCover: cover,
+            standaloneImages: {
+              for (var i = 0; i < count; i++)
+                if ((mask & (1 << i)) != 0) i,
+            },
           );
           final indices = <int>[];
           for (var p = 1; p <= layout.pageCount; p++) {

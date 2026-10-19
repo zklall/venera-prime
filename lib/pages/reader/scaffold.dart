@@ -493,7 +493,9 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
               if (end - start == 2)
                 CheckedPopupMenuItem<String>(
                   value: 'pair',
-                  checked: this.context.reader.joinedSpreadPairs.contains(start),
+                  checked: this.context.reader.joinedSpreadPairs.contains(
+                    start,
+                  ),
                   child: Text('Keep these pages as a spread'.tl),
                 ),
               if (end - start == 1) ...[

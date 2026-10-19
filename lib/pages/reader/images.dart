@@ -193,6 +193,7 @@ class _GalleryModeState extends State<_GalleryMode>
     if (_spreadSizeUpdateScheduled) return;
     _spreadSizeUpdateScheduled = true;
     SchedulerBinding.instance.addPostFrameCallback((_) => _flushSpreadSizes());
+    SchedulerBinding.instance.ensureVisualUpdate();
   }
 
   void _flushSpreadSizes() {

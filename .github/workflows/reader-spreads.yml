@@ -1,7 +1,5 @@
 name: Reader spreads
 on:
-  push:
-    branches: [feat/book-spreads]
   pull_request:
     paths:
       - 'lib/pages/reader/**'
@@ -25,10 +23,8 @@ jobs:
           flutter-version-file: pubspec.yaml
           cache: true
       - run: flutter pub get
-      - name: Format changed Dart files
-        run: |
-          dart format lib/pages/reader/reader.dart lib/pages/reader/images.dart lib/pages/reader/comic_image.dart lib/pages/reader/scaffold.dart lib/utils/reader_page_layout.dart lib/utils/reader_spread_geometry.dart test/reader_page_layout_test.dart test/reader_spread_geometry_test.dart test/reader_book_spread_test.dart test/reader_page_margin_test.dart test/support/reader_spread_cases.dart
-          git diff -- '*.dart'
+      - name: Check Dart formatting
+        run: dart format --output=none --set-exit-if-changed lib/pages/reader/reader.dart lib/pages/reader/images.dart lib/pages/reader/comic_image.dart lib/pages/reader/scaffold.dart lib/utils/reader_page_layout.dart lib/utils/reader_spread_geometry.dart test/reader_page_layout_test.dart test/reader_spread_geometry_test.dart test/reader_book_spread_test.dart test/reader_page_margin_test.dart test/support/reader_spread_cases.dart
       - name: Analyze reader changes
         run: flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings lib/pages/reader/reader.dart lib/utils/reader_page_layout.dart lib/utils/reader_spread_geometry.dart test/reader_page_layout_test.dart test/reader_spread_geometry_test.dart test/reader_book_spread_test.dart
       - name: Test spread layout and reader regressions
