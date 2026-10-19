@@ -1,5 +1,10 @@
 {
   "zh_CN": {
+    "Spread layout": "跨页排版",
+    "Keep these pages as a spread": "将这两页固定为跨页",
+    "Show image across both pages": "让这张图占满双页",
+    "Treat image as one page": "将这张图作为普通单页",
+    "Reset spread layout": "恢复自动跨页排版",
     "Save": "保存",
     "Failed to export": "导出失败",
     "Directory display order": "目录显示排序",
@@ -688,6 +693,11 @@
     "Read a comic or swipe left to mark its latest chapters as read. Following stays enabled.": "阅读漫画或左滑可标记已看完最新章节，仍保留追更。"
   },
   "zh_TW": {
+    "Spread layout": "跨頁排版",
+    "Keep these pages as a spread": "將這兩頁固定為跨頁",
+    "Show image across both pages": "讓這張圖佔滿雙頁",
+    "Treat image as one page": "將這張圖作為普通單頁",
+    "Reset spread layout": "恢復自動跨頁排版",
     "Save": "儲存",
     "Failed to export": "匯出失敗",
     "Directory display order": "目錄顯示排序",
@@ -1375,3 +1385,4 @@
     "Read a comic or swipe left to mark its latest chapters as read. Following stays enabled.": "閱讀漫畫或左滑可標記已看完最新章節，仍保留追更。"
   }
 }
+

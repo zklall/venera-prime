@@ -475,6 +475,43 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     }
 
     final buttons = [
+      if (context.reader.twoPageSpread)
+        PopupMenuButton<String>(
+          key: const Key('reader-spread-options'),
+          tooltip: 'Spread layout'.tl,
+          icon: const Icon(Icons.menu_book_outlined),
+          enabled: context.reader.canShiftImages,
+          onSelected: (value) {
+            context.reader.setSpreadOverride(value == 'auto' ? null : value);
+            update();
+          },
+          itemBuilder: (context) {
+            final (start, end) = this.context.reader.imageLayout.range(
+              this.context.reader.page,
+            );
+            return [
+              if (end - start == 2)
+                PopupMenuItem(
+                  value: 'pair',
+                  child: Text('Keep these pages as a spread'.tl),
+                ),
+              if (end - start == 1) ...[
+                PopupMenuItem(
+                  value: 'spread',
+                  child: Text('Show image across both pages'.tl),
+                ),
+                PopupMenuItem(
+                  value: 'page',
+                  child: Text('Treat image as one page'.tl),
+                ),
+              ],
+              PopupMenuItem(
+                value: 'auto',
+                child: Text('Reset spread layout'.tl),
+              ),
+            ];
+          },
+        ),
       IconButton(
         key: const Key('reader-page-margin-toggle'),
         tooltip: 'Page margin'.tl,
@@ -1376,3 +1413,4 @@ class _SelectImageOverlayContentState
     );
   }
 }
+

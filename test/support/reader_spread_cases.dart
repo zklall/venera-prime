@@ -174,7 +174,9 @@ void registerReaderSpreadTests({bool device = false}) {
       expect(find.byKey(const ValueKey('reader-spread-blank')), findsOneWidget);
       expect(
         tester.getSize(image(5)).width,
-        closeTo(tester.getSize(find.byType(Reader)).width / 2, 1),
+        closeTo(tester.getSize(find.byKey(
+          const ValueKey('reader-spread-blank'),
+        )).width, 1),
       );
 
       // Switching to single-page and back keeps the same underlying image.
@@ -246,3 +248,4 @@ void registerReaderSpreadTests({bool device = false}) {
     },
   );
 }
+

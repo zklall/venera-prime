@@ -440,6 +440,7 @@ class Settings with ChangeNotifier {
     'autoPageTurningInterval': 5, // in seconds
     'readerMode': 'galleryLeftToRight', // values of [ReaderMode]
     'readerTwoPageSpread': false,
+    'readerSpreadOverrides': <String, dynamic>{},
     'readerPageMarginEnabled': false,
     'readerPageMarginPercent': 19.3,
     'readerScreenPicNumberForLandscape': 1, // 1 - 5
@@ -645,3 +646,4 @@ async function processImage(image, cid, eid, page, sourceKey) {
 
 const _defaultSourceListUrl =
     "https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/index.json";
+
