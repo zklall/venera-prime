@@ -822,6 +822,14 @@ abstract mixin class _ImagePerPageHandler {
     twoPageSpread ? 'readerSpreadSingleCover' : 'showSingleImageOnFirstPage',
   );
 
+  bool get spreadRightToLeft =>
+      appdata.settings.getReaderSetting(
+        cid,
+        type.sourceKey,
+        'readerSpreadRightToLeft',
+      ) ==
+      true;
+
   bool get twoPageSpread =>
       (mode == ReaderMode.galleryLeftToRight ||
           mode == ReaderMode.galleryRightToLeft) &&

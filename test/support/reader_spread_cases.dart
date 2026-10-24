@@ -45,6 +45,7 @@ void registerReaderSpreadTests({bool device = false}) {
       appdata.settings['readerMode'] = 'galleryLeftToRight';
       appdata.settings['readerTwoPageSpread'] = true;
       appdata.settings['readerSpreadSingleCover'] = false;
+      appdata.settings['readerSpreadRightToLeft'] = false;
       appdata.settings['showSingleImageOnFirstPage'] = false;
       appdata.settings['enablePageAnimation'] = true;
       appdata.settings['limitImageWidth'] = true;
@@ -193,6 +194,7 @@ void registerReaderSpreadTests({bool device = false}) {
       await settle();
       expect(state.page, 3);
       state.mode = ReaderMode.galleryRightToLeft;
+      appdata.settings['readerSpreadRightToLeft'] = true;
       state.update();
       await settle();
       await jump(1);

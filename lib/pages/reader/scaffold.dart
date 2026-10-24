@@ -467,6 +467,9 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
   }
 
   Widget buildBottom() {
+    final imageOrderReversed = context.reader.twoPageSpread
+        ? context.reader.spreadRightToLeft
+        : isReversed;
     // Use maxPage for display (excluding chapter comments page)
     final displayPage = context.reader.page.clamp(1, context.reader.maxPage);
     var text = "E${context.reader.chapter} : P$displayPage";
@@ -529,7 +532,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
           icon: Icon(
             context.reader.mode == ReaderMode.galleryTopToBottom
                 ? Icons.arrow_upward
-                : isReversed
+                : imageOrderReversed
                 ? Icons.arrow_forward
                 : Icons.arrow_back,
           ),
@@ -545,7 +548,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
           icon: Icon(
             context.reader.mode == ReaderMode.galleryTopToBottom
                 ? Icons.arrow_downward
-                : isReversed
+                : imageOrderReversed
                 ? Icons.arrow_back
                 : Icons.arrow_forward,
           ),

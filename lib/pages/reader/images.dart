@@ -152,7 +152,7 @@ class _ReaderImagesState extends State<_ReaderImages> {
             true;
         return _GalleryMode(
           key: Key(
-            '${reader.mode.key}_${reader.imagesPerPage}_${reader.twoPageSpread}_${reader.showSingleImageOnFirstPage()}_${reader.imageGroupingOffset}_${reader.imageGroupingAnchor}_${reader.spreadLayoutRevision}_${showComments}_$showCommentsAtEnd',
+            '${reader.mode.key}_${reader.imagesPerPage}_${reader.twoPageSpread}_${reader.twoPageSpread && reader.spreadRightToLeft}_${reader.showSingleImageOnFirstPage()}_${reader.imageGroupingOffset}_${reader.imageGroupingAnchor}_${reader.spreadLayoutRevision}_${showComments}_$showCommentsAtEnd',
           ),
         );
       } else {
@@ -623,7 +623,7 @@ class _GalleryModeState extends State<_GalleryMode>
         !reader.standaloneSpreadImages.contains(startIndex)) {
       slots = singleCover ? [null, 0] : [0, null];
     }
-    if (reader.mode == ReaderMode.galleryRightToLeft) {
+    if (reader.spreadRightToLeft) {
       slots = slots.reversed.toList();
     }
     return LayoutBuilder(

@@ -30,7 +30,7 @@ void main() {
   tearDown(() => DataSync.instance = previousSync);
 
   testWidgets(
-    'Komiic reader screens 46 and 47 keep source images 92 and 93 together',
+    'Komiic spread keeps image 93 left and image 92 right independent of navigation',
     (tester) async {
       // The screenshots show screen 46 = images 91/92, screen 47 = 93/94.
       // The intended pair is 92/93; both are 980x1411 in a 193-image volume.
@@ -40,6 +40,7 @@ void main() {
         imageCount: 193,
         initialPage: 92,
         useDefaultSpreadCover: true,
+        useDefaultSpreadPageOrder: true,
         imageSizes: {92: const Size(980, 1411), 93: const Size(980, 1411)},
       );
       appdata.settings['readerTwoPageSpread'] = true;
@@ -52,7 +53,7 @@ void main() {
       Finder image(int n) => find.byKey(ValueKey('reader-spread-image-$n'));
       final first = tester.getRect(image(92));
       final second = tester.getRect(image(93));
-      expect(first.right, closeTo(second.left, 1));
+      expect(second.right, closeTo(first.left, 1));
       expect(first.height, closeTo(second.height, 1));
 
       state.mode = ReaderMode.galleryRightToLeft;
@@ -64,6 +65,25 @@ void main() {
         closeTo(tester.getRect(image(92)).left, 1),
       );
 
+      // Page order is a book preference; changing it leaves the current pair
+      // and the navigation direction intact.
+      final previousOrder = appdata.settings['readerSpreadRightToLeft'];
+      addTearDown(() {
+        appdata.settings['readerSpreadRightToLeft'] = previousOrder;
+      });
+      appdata.settings['readerSpreadRightToLeft'] = false;
+      state.update();
+      await fixture.settle(tester);
+      expect(state.mode, ReaderMode.galleryRightToLeft);
+      expect(state.imageLayout.range(state.page), (91, 93));
+      expect(
+        tester.getRect(image(92)).right,
+        closeTo(tester.getRect(image(93)).left, 1),
+      );
+      appdata.settings['readerSpreadRightToLeft'] = previousOrder;
+      state.update();
+      await fixture.settle(tester);
+
       appdata.settings['readerTwoPageSpread'] = false;
       state.update();
       await fixture.settle(tester);
@@ -72,6 +92,10 @@ void main() {
       state.update();
       await fixture.settle(tester);
       expect(state.imageLayout.range(state.page), (91, 93));
+      expect(
+        tester.getRect(image(93)).right,
+        closeTo(tester.getRect(image(92)).left, 1),
+      );
       expect(appdata.settings['showSingleImageOnFirstPage'], isFalse);
       expect(tester.takeException(), isNull);
       await closeReader(tester);

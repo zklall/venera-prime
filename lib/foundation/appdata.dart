@@ -441,6 +441,7 @@ class Settings with ChangeNotifier {
     'readerMode': 'galleryLeftToRight', // values of [ReaderMode]
     'readerTwoPageSpread': false,
     'readerSpreadSingleCover': true,
+    'readerSpreadRightToLeft': true,
     'readerSpreadOverrides': <String, dynamic>{},
     'readerPageMarginEnabled': false,
     'readerPageMarginPercent': 19.3,

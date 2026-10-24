@@ -47,6 +47,7 @@ Future<dynamic> openReader(
   int imageCount = 30,
   int initialPage = 10,
   bool useDefaultSpreadCover = false,
+  bool useDefaultSpreadPageOrder = false,
 }) async {
   tester.view.physicalSize = const Size(1000, 600);
   tester.view.devicePixelRatio = 1;
@@ -78,6 +79,8 @@ Future<dynamic> openReader(
     'readerPageMarginPercent': 19.3,
     'readerTwoPageSpread': false,
     if (!useDefaultSpreadCover) 'readerSpreadSingleCover': false,
+    if (!useDefaultSpreadPageOrder)
+      'readerSpreadRightToLeft': mode == 'galleryRightToLeft',
     'readerSpreadOverrides': <String, dynamic>{},
     'showSingleImageOnFirstPage': false,
     'readerScreenPicNumberForLandscape': 1,
@@ -344,6 +347,7 @@ void main() {
       await settle(tester);
       expect(state.imageLayout.range(state.page), (9, 11));
       state.mode = ReaderMode.galleryRightToLeft;
+      appdata.settings['readerSpreadRightToLeft'] = true;
       state.update();
       await settle(tester);
       expect(state.imageLayout.range(state.page), (9, 11));
@@ -610,6 +614,7 @@ void main() {
         closeTo(tester.getRect(image(10)).left, 0.1),
       );
       state.mode = ReaderMode.galleryRightToLeft;
+      appdata.settings['readerSpreadRightToLeft'] = true;
       state.update();
       await settle(tester);
       expect(state.page, 5);

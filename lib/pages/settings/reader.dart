@@ -374,6 +374,19 @@ class _ReaderSettingsState extends State<ReaderSettings> {
             useDeviceSettings: useDeviceSpecificSettings,
           ),
         ),
+        SliverAnimatedVisibility(
+          visible: twoPageSpread,
+          child: _SwitchSetting(
+            title: 'Right-to-left order within spreads'.tl,
+            subtitle:
+                'Put the earlier page on the right, as in Japanese manga.'.tl,
+            settingKey: 'readerSpreadRightToLeft',
+            onChanged: () => widget.onChanged?.call('readerSpreadRightToLeft'),
+            comicId: isEnabledSpecificSettings ? widget.comicId : null,
+            comicSource: isEnabledSpecificSettings ? widget.comicSource : null,
+            useDeviceSettings: useDeviceSpecificSettings,
+          ),
+        ),
         _SliderSetting(
           title: "Auto page turning interval".tl,
           settingsIndex: "autoPageTurningInterval",
