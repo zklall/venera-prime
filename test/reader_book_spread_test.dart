@@ -30,55 +30,6 @@ void main() {
   tearDown(() => DataSync.instance = previousSync);
 
   testWidgets(
-    'Komiic volume pages 46 and 47 share a spread with the default book cover',
-    (tester) async {
-      // Golden Kamuy volume 2 has 193 portrait images. The two halves are
-      // 980x1411; neither half can be recognized as a wide image by itself.
-      final dynamic state = await fixture.openReader(
-        tester,
-        'galleryLeftToRight',
-        imageCount: 193,
-        initialPage: 46,
-        useDefaultSpreadCover: true,
-        imageSizes: {46: const Size(980, 1411), 47: const Size(980, 1411)},
-      );
-      appdata.settings['readerTwoPageSpread'] = true;
-      state.update();
-      await fixture.settle(tester);
-
-      expect(state.imageLayout.range(1), (0, 1));
-      expect(state.imageLayout.range(state.page), (45, 47));
-      expect(state.maxPage, 97);
-      Finder image(int n) => find.byKey(ValueKey('reader-spread-image-$n'));
-      final first = tester.getRect(image(46));
-      final second = tester.getRect(image(47));
-      expect(first.right, closeTo(second.left, 1));
-      expect(first.height, closeTo(second.height, 1));
-
-      state.mode = ReaderMode.galleryRightToLeft;
-      state.update();
-      await fixture.settle(tester);
-      expect(state.imageLayout.range(state.page), (45, 47));
-      expect(
-        tester.getRect(image(47)).right,
-        closeTo(tester.getRect(image(46)).left, 1),
-      );
-
-      appdata.settings['readerTwoPageSpread'] = false;
-      state.update();
-      await fixture.settle(tester);
-      expect(state.page, 46);
-      appdata.settings['readerTwoPageSpread'] = true;
-      state.update();
-      await fixture.settle(tester);
-      expect(state.imageLayout.range(state.page), (45, 47));
-      expect(appdata.settings['showSingleImageOnFirstPage'], isFalse);
-      expect(tester.takeException(), isNull);
-      await closeReader(tester);
-    },
-  );
-
-  testWidgets(
     'book spreads align uneven pages, isolate wide images and retain progress',
     (tester) async {
       final dynamic state = await fixture.openReader(

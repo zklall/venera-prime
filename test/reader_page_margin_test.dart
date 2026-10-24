@@ -44,9 +44,6 @@ Future<dynamic> openReader(
   WidgetTester tester,
   String mode, {
   Map<int, Size> imageSizes = const {},
-  int imageCount = 30,
-  int initialPage = 10,
-  bool useDefaultSpreadCover = false,
 }) async {
   tester.view.physicalSize = const Size(1000, 600);
   tester.view.devicePixelRatio = 1;
@@ -77,7 +74,6 @@ Future<dynamic> openReader(
     'readerPageMarginEnabled': true,
     'readerPageMarginPercent': 19.3,
     'readerTwoPageSpread': false,
-    if (!useDefaultSpreadCover) 'readerSpreadSingleCover': false,
     'readerSpreadOverrides': <String, dynamic>{},
     'showSingleImageOnFirstPage': false,
     'readerScreenPicNumberForLandscape': 1,
@@ -116,7 +112,7 @@ Future<dynamic> openReader(
     ))!.buffer.asUint8List();
     image.dispose();
     picture.dispose();
-    for (var i = 1; i <= imageCount; i++) {
+    for (var i = 1; i <= 30; i++) {
       final size = imageSizes[i];
       if (size == null) {
         File('${dir.path}/$i.png').writeAsBytesSync(bytes);
@@ -179,8 +175,8 @@ Future<dynamic> openReader(
         cid: comic.id,
         name: comic.title,
         chapters: null,
-        initialPage: initialPage,
-        history: History.fromModel(model: comic, ep: 1, page: initialPage),
+        initialPage: 10,
+        history: History.fromModel(model: comic, ep: 1, page: 10),
         author: '',
         tags: [],
       ),
@@ -191,7 +187,7 @@ Future<dynamic> openReader(
   for (var i = 0; i < 20 && state.images == null; i++) {
     await settle(tester);
   }
-  expect(state.images, hasLength(imageCount));
+  expect(state.images, hasLength(30));
   for (var i = 0; i < 20 && find.byType(RawImage).evaluate().isEmpty; i++) {
     await settle(tester);
   }

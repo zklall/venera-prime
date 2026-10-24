@@ -44,7 +44,6 @@ void registerReaderSpreadTests({bool device = false}) {
       );
       appdata.settings['readerMode'] = 'galleryLeftToRight';
       appdata.settings['readerTwoPageSpread'] = true;
-      appdata.settings['readerSpreadSingleCover'] = false;
       appdata.settings['showSingleImageOnFirstPage'] = false;
       appdata.settings['enablePageAnimation'] = true;
       appdata.settings['limitImageWidth'] = true;
@@ -226,7 +225,7 @@ void registerReaderSpreadTests({bool device = false}) {
         expect(state.imagesPerPage, 2);
         expect(state.page, 1);
       }
-      appdata.settings['readerSpreadSingleCover'] = true;
+      appdata.settings['showSingleImageOnFirstPage'] = true;
       state.update();
       await settle();
       expect(image(1), findsOneWidget);

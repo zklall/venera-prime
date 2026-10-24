@@ -440,7 +440,6 @@ class Settings with ChangeNotifier {
     'autoPageTurningInterval': 5, // in seconds
     'readerMode': 'galleryLeftToRight', // values of [ReaderMode]
     'readerTwoPageSpread': false,
-    'readerSpreadSingleCover': true,
     'readerSpreadOverrides': <String, dynamic>{},
     'readerPageMarginEnabled': false,
     'readerPageMarginPercent': 19.3,
