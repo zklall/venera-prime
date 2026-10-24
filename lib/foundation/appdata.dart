@@ -253,6 +253,7 @@ class Appdata with Init {
     "rememberReaderOrientation",
     "rememberReaderOrientationPerComic",
     ReaderOrientationBehavior.settingKey,
+    'readerRotationDefault',
   ];
 
   /// Sync data from another device
@@ -441,6 +442,7 @@ class Settings with ChangeNotifier {
     'autoPageTurningInterval': 5, // in seconds
     'readerMode': 'galleryLeftToRight', // values of [ReaderMode]
     'readerTwoPageSpread': false,
+    'readerRotationDefault': 'none',
     'readerSpreadSingleCover': true,
     'readerSpreadRightToLeft': true,
     'readerSpreadOverrides': <String, dynamic>{},

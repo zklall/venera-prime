@@ -176,32 +176,24 @@ class _ReaderSettingsState extends State<ReaderSettings> {
               Divider().toSliver(),
             ],
           ),
-        if (App.isAndroid)
-          SliverMainAxisGroup(
-            slivers: [
-              SelectSetting(
-                title: "Reader screen orientation behavior".tl,
-                settingKey: ReaderOrientationBehavior.settingKey,
-                optionTranslation: {
-                  ReaderOrientationBehavior.keepAfterExit.storageValue:
-                      "Keep rotation after leaving reader".tl,
-                  ReaderOrientationBehavior.sessionOnly.storageValue:
-                      "Restore pre-rotation state after leaving reader".tl,
-                  ReaderOrientationBehavior.rememberGlobally.storageValue:
-                      "Remember for all comics".tl,
-                  ReaderOrientationBehavior.rememberPerComic.storageValue:
-                      "Remember separately for each comic".tl,
-                },
-                help:
-                    "Except for keeping rotation after exit, all modes restore the screen orientation from before entering the reader when leaving."
-                        .tl,
-                onChanged: () {
-                  widget.onChanged?.call(ReaderOrientationBehavior.settingKey);
-                },
-              ).toSliver(),
-              Divider().toSliver(),
-            ],
-          ),
+        SliverMainAxisGroup(
+          slivers: [
+            SelectSetting(
+              title: 'Reading direction'.tl,
+              settingKey: ReaderRotationPreference.settingKey,
+              optionTranslation: {
+                'none': 'Not pinned'.tl,
+                for (final direction in ReaderRotation.values)
+                  direction.name: direction.label.tl,
+              },
+              help: 'You can also pin a direction from the reader toolbar.'.tl,
+              onChanged: () {
+                widget.onChanged?.call(ReaderRotationPreference.settingKey);
+              },
+            ).toSliver(),
+            Divider().toSliver(),
+          ],
+        ),
         _SwitchSetting(
           title: "Tap to turn Pages".tl,
           settingKey: "enableTapToTurnPages",

@@ -188,8 +188,9 @@ class _GalleryModeState extends State<_GalleryMode>
   void _queueSpreadAlignment(int start) {
     if (!mounted ||
         _spreadAlignments.containsKey(start) ||
-        !reader.alignedSpreadPairs.contains(start))
+        !reader.alignedSpreadPairs.contains(start)) {
       return;
+    }
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _spreadAlignments.containsKey(start)) return;
       final ordered = reader.spreadRightToLeft
@@ -245,8 +246,9 @@ class _GalleryModeState extends State<_GalleryMode>
   void _queueSpreadSize(int index, Size size) {
     if (!mounted) return;
     if (reader.spreadImageSizes[index] == size ||
-        _pendingSpreadSizes[index] == size)
+        _pendingSpreadSizes[index] == size) {
       return;
+    }
     _pendingSpreadSizes[index] = size;
     if (_spreadSizeUpdateScheduled) return;
     _spreadSizeUpdateScheduled = true;
@@ -772,14 +774,17 @@ class _GalleryModeState extends State<_GalleryMode>
         for (final imageState in imageStates) {
           final key = imageState.widget.key;
           if (key != ValueKey('reader-spread-image-${start + 1}') &&
-              key != ValueKey('reader-spread-image-${end}'))
+              key != ValueKey('reader-spread-image-$end')) {
             continue;
+          }
           final box = imageState.context.findRenderObject();
           if (box is! RenderBox || !box.hasSize) continue;
-          final origin = box.localToGlobal(Offset.zero);
-          final globalRect = origin & box.size;
-          if (!globalRect.contains(location)) continue;
-          final center = viewport.globalToLocal(globalRect.center);
+          if (!(Offset.zero & box.size).contains(box.globalToLocal(location))) {
+            continue;
+          }
+          final center = viewport.globalToLocal(
+            box.localToGlobal(box.size.center(Offset.zero)),
+          );
           final target =
               initial * (viewport.size.width / box.size.width).clamp(1.0, 4.0);
           controller.animateScale?.call(
@@ -801,6 +806,9 @@ class _GalleryModeState extends State<_GalleryMode>
     var photoViewController = photoViewControllers[reader.page]!;
     double target = initialScaleForPage() * 1.75;
     var size = reader.size;
+    location = (context.findRenderObject() as RenderBox).globalToLocal(
+      location,
+    );
     Offset zoomPosition;
     if (appdata.settings['longPressZoomPosition'] != 'center') {
       zoomPosition = Offset(
@@ -1639,6 +1647,9 @@ class _ContinuousModeState extends State<_ContinuousMode>
       target = photoViewController.getInitialScale!.call()! * 1.75;
     }
     var size = MediaQuery.of(context).size;
+    location = (context.findRenderObject() as RenderBox).globalToLocal(
+      location,
+    );
     photoViewController.animateScale?.call(
       target,
       Offset(size.width / 2 - location.dx, size.height / 2 - location.dy),
@@ -1653,6 +1664,9 @@ class _ContinuousModeState extends State<_ContinuousMode>
     }
     double target = photoViewController.getInitialScale!.call()! * 1.75;
     var size = reader.size;
+    location = (context.findRenderObject() as RenderBox).globalToLocal(
+      location,
+    );
     Offset zoomPosition;
     if (appdata.settings['longPressZoomPosition'] != 'center') {
       zoomPosition = Offset(

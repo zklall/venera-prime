@@ -392,7 +392,7 @@ jobs:
         with:
           tag_name: ${{ needs.Validate_Version.outputs.tag }}
           target_commitish: ${{ github.sha }}
-          name: Venera Prime ${{ needs.Validate_Version.outputs.version }}
+          name: Venera Z ${{ needs.Validate_Version.outputs.version }}
           body_path: ${{ needs.Validate_Version.outputs.notes }}
           files: |
             outputs/*.ipa

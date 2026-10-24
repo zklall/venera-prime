@@ -50,7 +50,7 @@ if not release_notes_path.is_file():
 release_notes_title = release_notes_path.read_text(
     encoding="utf-8"
 ).splitlines()[0]
-expected_release_notes_title = f"# Venera Prime {pubspec_base_version}"
+expected_release_notes_title = f"# Venera Z {pubspec_base_version}"
 if release_notes_title != expected_release_notes_title:
     fail(
         "Release notes title mismatch: "

@@ -1,160 +1,90 @@
-import 'dart:convert';
+import 'dart:ui' show DisplayFeature;
 
-import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 
 import 'appdata.dart';
-import 'reader_orientation_behavior.dart';
 
-export 'reader_orientation_behavior.dart';
+/// Rotation relative to the screen, independent of Android's classification of
+/// a foldable's inner display as portrait or landscape.
+enum ReaderRotation {
+  normal(0, 'Default direction'),
+  left(3, 'Rotate left 90°'),
+  right(1, 'Rotate right 90°');
 
-enum ReaderOrientationMode {
-  automatic,
-  portrait,
-  landscape;
+  const ReaderRotation(this.quarterTurns, this.label);
+  final int quarterTurns;
+  final String label;
 
-  ReaderOrientationMode get next => switch (this) {
-    automatic => portrait,
-    portrait => landscape,
-    landscape => automatic,
-  };
-
-  List<DeviceOrientation> get orientations => switch (this) {
-    automatic => DeviceOrientation.values,
-    portrait => const [
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ],
-    landscape => const [
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ],
-  };
-
-  static ReaderOrientationMode fromStorage(Object? value) {
-    return ReaderOrientationMode.values.firstWhere(
-      (mode) => mode.name == value,
-      orElse: () => automatic,
-    );
+  static ReaderRotation? fromStorage(Object? value) {
+    for (final rotation in values) {
+      if (rotation.name == value) return rotation;
+    }
+    return null;
   }
-}
 
-class ReaderOrientationMemory {
-  static const behaviorSettingKey = ReaderOrientationBehavior.settingKey;
-  static const globalModeKey = 'readerOrientationMode';
-  static const comicModesKey = 'readerOrientationModesByComic';
+  Size rotateSize(Size size) =>
+      quarterTurns.isOdd ? Size(size.height, size.width) : size;
 
-  static ReaderOrientationBehavior get behavior =>
-      ReaderOrientationBehavior.fromStorage(
-        appdata.settings[behaviorSettingKey],
+  EdgeInsets rotateInsets(EdgeInsets insets) => switch (quarterTurns) {
+    1 => EdgeInsets.fromLTRB(
+      insets.top,
+      insets.right,
+      insets.bottom,
+      insets.left,
+    ),
+    3 => EdgeInsets.fromLTRB(
+      insets.bottom,
+      insets.left,
+      insets.top,
+      insets.right,
+    ),
+    _ => insets,
+  };
+
+  Rect _rotateRect(Rect rect, Size screen) => switch (quarterTurns) {
+    1 => Rect.fromLTRB(
+      rect.top,
+      screen.width - rect.right,
+      rect.bottom,
+      screen.width - rect.left,
+    ),
+    3 => Rect.fromLTRB(
+      screen.height - rect.bottom,
+      rect.left,
+      screen.height - rect.top,
+      rect.right,
+    ),
+    _ => rect,
+  };
+
+  MediaQueryData mediaQuery(MediaQueryData data, Size viewport) =>
+      data.copyWith(
+        size: rotateSize(viewport),
+        padding: rotateInsets(data.padding),
+        viewPadding: rotateInsets(data.viewPadding),
+        viewInsets: rotateInsets(data.viewInsets),
+        systemGestureInsets: rotateInsets(data.systemGestureInsets),
+        displayFeatures: [
+          for (final feature in data.displayFeatures)
+            DisplayFeature(
+              bounds: _rotateRect(feature.bounds, viewport),
+              type: feature.type,
+              state: feature.state,
+            ),
+        ],
       );
-
-  static bool get restoresOnExit => behavior.restoresOnExit;
-
-  static bool get remembersOrientation => behavior.remembersOrientation;
-
-  static bool get perComic => behavior.remembersPerComic;
-
-  static String comicKey(String comicId, String sourceKey) =>
-      jsonEncode([sourceKey, comicId]);
-
-  static ReaderOrientationMode modeFor({
-    required String comicId,
-    required String sourceKey,
-  }) {
-    return modeFromData(
-      appdata.implicitData,
-      comicId: comicId,
-      sourceKey: sourceKey,
-      perComic: perComic,
-    );
-  }
-
-  static ReaderOrientationMode modeFromData(
-    Map<String, dynamic> data, {
-    required String comicId,
-    required String sourceKey,
-    required bool perComic,
-  }) {
-    if (!perComic) {
-      return ReaderOrientationMode.fromStorage(data[globalModeKey]);
-    }
-    final modes = data[comicModesKey];
-    if (modes is! Map) return ReaderOrientationMode.automatic;
-    return ReaderOrientationMode.fromStorage(
-      modes[comicKey(comicId, sourceKey)],
-    );
-  }
-
-  static void remember({
-    required String comicId,
-    required String sourceKey,
-    required ReaderOrientationMode mode,
-  }) {
-    if (!remembersOrientation) return;
-    rememberInData(
-      appdata.implicitData,
-      comicId: comicId,
-      sourceKey: sourceKey,
-      mode: mode,
-      perComic: perComic,
-    );
-    appdata.writeImplicitData();
-  }
-
-  static void rememberInData(
-    Map<String, dynamic> data, {
-    required String comicId,
-    required String sourceKey,
-    required ReaderOrientationMode mode,
-    required bool perComic,
-  }) {
-    if (!perComic) {
-      if (mode == ReaderOrientationMode.automatic) {
-        data.remove(globalModeKey);
-      } else {
-        data[globalModeKey] = mode.name;
-      }
-      return;
-    }
-
-    final storedModes = data[comicModesKey];
-    final modes = storedModes is Map
-        ? Map<String, dynamic>.from(storedModes)
-        : <String, dynamic>{};
-    final key = comicKey(comicId, sourceKey);
-    if (mode == ReaderOrientationMode.automatic) {
-      modes.remove(key);
-    } else {
-      modes[key] = mode.name;
-    }
-    if (modes.isEmpty) {
-      data.remove(comicModesKey);
-    } else {
-      data[comicModesKey] = modes;
-    }
-  }
 }
 
-class ReaderOrientationSystem {
-  static int _operation = 0;
+class ReaderRotationPreference {
+  static const settingKey = 'readerRotationDefault';
 
-  static Future<void> apply(ReaderOrientationMode mode) {
-    _operation++;
-    return SystemChrome.setPreferredOrientations(mode.orientations);
-  }
+  static ReaderRotation? get pinned =>
+      ReaderRotation.fromStorage(appdata.settings[settingKey]);
 
-  static Future<void> restore({required bool wasPortrait}) async {
-    final operation = ++_operation;
-    await SystemChrome.setPreferredOrientations(
-      wasPortrait
-          ? ReaderOrientationMode.portrait.orientations
-          : ReaderOrientationMode.landscape.orientations,
-    );
-    if (operation != _operation) return;
+  static ReaderRotation get initial => pinned ?? ReaderRotation.normal;
 
-    // Give Android time to rotate back before releasing the orientation lock.
-    await Future<void>.delayed(const Duration(milliseconds: 250));
-    if (operation != _operation) return;
-    await SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+  static Future<void> pin(ReaderRotation? rotation) {
+    appdata.settings[settingKey] = rotation?.name ?? 'none';
+    return appdata.saveData();
   }
 }

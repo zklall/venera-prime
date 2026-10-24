@@ -122,37 +122,9 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     Future.delayed(const Duration(milliseconds: 200), addDragListener);
   }
 
-  bool _orientationInitialized = false;
-  bool _restoreOrientationOnExit = false;
-  bool _rememberOrientation = false;
-  bool? _entryWasPortrait;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_orientationInitialized || !App.isAndroid) return;
-    _orientationInitialized = true;
-    _entryWasPortrait =
-        MediaQuery.orientationOf(context) == Orientation.portrait;
-    _restoreOrientationOnExit = ReaderOrientationMemory.restoresOnExit;
-    _rememberOrientation = ReaderOrientationMemory.remembersOrientation;
-    if (_rememberOrientation) {
-      rotation = ReaderOrientationMemory.modeFor(
-        comicId: context.reader.cid,
-        sourceKey: context.reader.type.sourceKey,
-      );
-      unawaited(ReaderOrientationSystem.apply(rotation));
-    }
-  }
-
   @override
   void dispose() {
     sliderFocus.dispose();
-    if (_restoreOrientationOnExit && _entryWasPortrait != null) {
-      unawaited(
-        ReaderOrientationSystem.restore(wasPortrait: _entryWasPortrait!),
-      );
-    }
     super.dispose();
   }
 
@@ -171,24 +143,8 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     });
   }
 
-  ReaderOrientationMode rotation = ReaderOrientationMode.automatic;
-
   void update() {
     setState(() {});
-  }
-
-  void updateOrientationBehavior() {
-    setState(() {
-      _restoreOrientationOnExit = ReaderOrientationMemory.restoresOnExit;
-      _rememberOrientation = ReaderOrientationMemory.remembersOrientation;
-    });
-    if (_rememberOrientation) {
-      ReaderOrientationMemory.remember(
-        comicId: context.reader.cid,
-        sourceKey: context.reader.type.sourceKey,
-        mode: rotation,
-      );
-    }
   }
 
   @override
@@ -282,7 +238,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
           child: Row(
             children: [
               const SizedBox(width: 8),
-              const BackButton(),
+              BackButton(onPressed: context.reader.exitReader),
               const SizedBox(width: 8),
               Expanded(
                 child: epName == null
@@ -524,17 +480,20 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
                 ),
               ],
               if (end - start == 1) ...[
-                PopupMenuItem(
+                CheckedPopupMenuItem<String>(
                   value: 'spread',
+                  checked: false,
                   child: Text('Show image across both pages'.tl),
                 ),
-                PopupMenuItem(
+                CheckedPopupMenuItem<String>(
                   value: 'page',
+                  checked: false,
                   child: Text('Treat image as one page'.tl),
                 ),
               ],
-              PopupMenuItem(
+              CheckedPopupMenuItem<String>(
                 value: 'auto',
+                checked: false,
                 child: Text('Reset spread layout'.tl),
               ),
             ];
@@ -599,38 +558,16 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
             },
           ),
         ),
-      if (App.isAndroid)
-        Tooltip(
-          message: "Screen Rotation".tl,
-          child: IconButton(
-            icon: () {
-              return switch (rotation) {
-                ReaderOrientationMode.automatic => const Icon(
-                  Icons.screen_rotation,
-                ),
-                ReaderOrientationMode.portrait => const Icon(
-                  Icons.screen_lock_portrait,
-                ),
-                ReaderOrientationMode.landscape => const Icon(
-                  Icons.screen_lock_landscape,
-                ),
-              };
-            }.call(),
-            onPressed: () {
-              setState(() {
-                rotation = rotation.next;
-              });
-              unawaited(ReaderOrientationSystem.apply(rotation));
-              if (_rememberOrientation) {
-                ReaderOrientationMemory.remember(
-                  comicId: context.reader.cid,
-                  sourceKey: context.reader.type.sourceKey,
-                  mode: rotation,
-                );
-              }
-            },
-          ),
+      IconButton(
+        key: const Key('reader-rotation-toggle'),
+        tooltip: 'Reading direction'.tl,
+        icon: Icon(
+          ReaderRotationPreference.pinned == context.reader.rotation.value
+              ? Icons.screen_lock_rotation
+              : Icons.screen_rotation,
         ),
+        onPressed: openRotation,
+      ),
       Tooltip(
         message: "Auto Page Turning".tl,
         child: IconButton(
@@ -970,8 +907,9 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
           if (key == "quickCollectImage") {
             addDragListener();
           }
-          if (key == ReaderOrientationMemory.behaviorSettingKey) {
-            updateOrientationBehavior();
+          if (key == ReaderRotationPreference.settingKey) {
+            context.reader.setRotation(ReaderRotationPreference.initial);
+            update();
           }
           if (key == "showChapterComments" ||
               key == "showChapterCommentsAtEnd") {
@@ -997,6 +935,36 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
         _gestureDetectorState?.clearIgnoreNextTap();
       });
     });
+  }
+
+  void openRotation() {
+    final reader = context.reader;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      constraints: const BoxConstraints(maxWidth: 480),
+      builder: (sheetContext) => SafeArea(
+        top: false,
+        child: ListenableBuilder(
+          listenable: Listenable.merge([reader.rotation, appdata.settings]),
+          builder: (context, _) => ReaderRotationPanel(
+            rotation: reader.rotation.value,
+            pinned: ReaderRotationPreference.pinned,
+            onChanged: reader.setRotation,
+            onPinChanged: (pin) {
+              unawaited(
+                ReaderRotationPreference.pin(
+                  pin ? reader.rotation.value : null,
+                ),
+              );
+              update();
+            },
+            onClose: () => Navigator.of(sheetContext).pop(),
+          ),
+        ),
+      ),
+    );
   }
 
   bool shouldShowChapterComments() {

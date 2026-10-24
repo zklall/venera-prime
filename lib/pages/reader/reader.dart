@@ -18,6 +18,7 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:venera/components/components.dart';
 import 'package:venera/components/custom_slider.dart';
 import 'package:venera/components/rich_comment_content.dart';
+import 'package:venera/components/reader_rotation.dart';
 import 'package:venera/components/window_frame.dart';
 import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/appdata.dart';
@@ -130,6 +131,17 @@ class _ReaderState extends State<Reader>
         _VolumeListener,
         _ImagePerPageHandler,
         WidgetsBindingObserver {
+  late final rotation = ValueNotifier(ReaderRotationPreference.initial);
+  final _readerNavigatorKey = GlobalKey<NavigatorState>();
+
+  void setRotation(ReaderRotation value) {
+    if (rotation.value == value) return;
+    rotation.value = value;
+    update();
+  }
+
+  void exitReader() => Navigator.of(context).maybePop();
+
   @override
   void update() {
     if (mounted) setState(() {});
@@ -369,7 +381,8 @@ class _ReaderState extends State<Reader>
 
   @override
   bool get isPortrait =>
-      MediaQuery.of(context).orientation == Orientation.portrait;
+      rotation.value.rotateSize(MediaQuery.sizeOf(context)).width <=
+      rotation.value.rotateSize(MediaQuery.sizeOf(context)).height;
 
   History? history;
 
@@ -478,6 +491,7 @@ class _ReaderState extends State<Reader>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    rotation.dispose();
     _commitReadingSession();
     if (isFullscreen) {
       fullscreen();
@@ -545,32 +559,38 @@ class _ReaderState extends State<Reader>
       focusNode: focusNode,
       autofocus: true,
       onKeyEvent: onKeyEvent,
-      child: Overlay(
-        initialEntries: [
-          OverlayEntry(
-            builder: (context) {
-              return Stack(
-                children: [
-                  _ReaderScaffold(
-                    child: _ReaderGestureDetector(
-                      child: _ReaderImages(key: Key(chapter.toString())),
-                    ),
-                  ),
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: AnimatedOpacity(
-                        opacity: _showWhiteRefreshOverlay ? 1 : 0,
-                        duration: const Duration(milliseconds: 40),
-                        curve: Curves.linear,
-                        child: const ColoredBox(color: Colors.white),
+      child: ReaderRotationViewport(
+        rotation: rotation.value,
+        child: NavigatorPopHandler<void>(
+          onPopWithResult: (_) => _readerNavigatorKey.currentState!.pop(),
+          child: Navigator(
+            key: _readerNavigatorKey,
+            pages: [
+              MaterialPage<void>(
+                child: Stack(
+                  children: [
+                    _ReaderScaffold(
+                      child: _ReaderGestureDetector(
+                        child: _ReaderImages(key: Key(chapter.toString())),
                       ),
                     ),
-                  ),
-                ],
-              );
-            },
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: AnimatedOpacity(
+                          opacity: _showWhiteRefreshOverlay ? 1 : 0,
+                          duration: const Duration(milliseconds: 40),
+                          curve: Curves.linear,
+                          child: const ColoredBox(color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            onDidRemovePage: (_) {},
           ),
-        ],
+        ),
       ),
     );
   }
@@ -731,7 +751,7 @@ class _ReaderState extends State<Reader>
   /// The size is not always the same as the size of the screen.
   Size get size {
     var renderBox = context.findRenderObject() as RenderBox;
-    return renderBox.size;
+    return rotation.value.rotateSize(renderBox.size);
   }
 }
 

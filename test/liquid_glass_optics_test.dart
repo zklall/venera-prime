@@ -39,6 +39,7 @@ void main() {
         double ratio,
         bool enabled,
         bool nested,
+        int turns,
       ) async {
         tester.view.devicePixelRatio = ratio;
         tester.view.physicalSize = Size(400 * ratio, 280 * ratio);
@@ -60,9 +61,14 @@ void main() {
                       if (enabled)
                         Positioned.fromRect(
                           rect: lens,
-                          child: const LiquidGlass(
-                            borderRadius: BorderRadius.all(Radius.circular(28)),
-                            child: SizedBox.expand(),
+                          child: RotatedBox(
+                            quarterTurns: turns,
+                            child: const LiquidGlass(
+                              borderRadius: BorderRadius.all(
+                                Radius.circular(28),
+                              ),
+                              child: SizedBox.expand(),
+                            ),
                           ),
                         ),
                     ],
@@ -95,16 +101,18 @@ void main() {
       }
 
       for (final sample in [
-        (const Rect.fromLTWH(68, 84, 220, 100), 1.0, false),
-        (const Rect.fromLTWH(96, 40, 180, 160), 2.0, false),
-        (const Rect.fromLTWH(68, 44, 220, 130), 2.0, true),
+        (const Rect.fromLTWH(68, 84, 220, 100), 1.0, false, 0),
+        (const Rect.fromLTWH(96, 40, 180, 160), 2.0, false, 0),
+        (const Rect.fromLTWH(68, 44, 220, 130), 2.0, true, 0),
+        (const Rect.fromLTWH(68, 44, 220, 130), 2.0, true, 1),
+        (const Rect.fromLTWH(68, 44, 220, 130), 2.0, true, 3),
       ]) {
-        final (localLens, ratio, nested) = sample;
+        final (localLens, ratio, nested, turns) = sample;
         final lens = localLens.shift(
           nested ? const Offset(32, 24) : Offset.zero,
         );
-        final before = await capture(localLens, ratio, false, nested);
-        final after = await capture(localLens, ratio, true, nested);
+        final before = await capture(localLens, ratio, false, nested, turns);
+        final after = await capture(localLens, ratio, true, nested, turns);
         final width = (400 * ratio).round();
         double difference(Rect area) {
           var sum = 0, count = 0;
@@ -134,7 +142,7 @@ void main() {
         );
         final outside = difference(const Rect.fromLTWH(8, 8, 20, 20));
         debugPrint(
-          'clear glass DPR $ratio: centre=$centre, bevel=$bevel, outside=$outside',
+          'clear glass DPR $ratio turns $turns: centre=$centre, bevel=$bevel, outside=$outside',
         );
         expect(
           centre,

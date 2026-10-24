@@ -107,10 +107,7 @@ jobs:
           gradle.write_text(text)
 
           manifest = Path('android/app/src/main/AndroidManifest.xml')
-          old = 'android:label="Venera Prime"'
-          text = manifest.read_text()
-          assert text.count(old) == 1
-          manifest.write_text(text.replace(old, 'android:label="Venera Prime Fork"'))
+          assert manifest.read_text().count('android:label="Venera Z"') == 1
           PY
 
       - name: Set up Rust toolchain
@@ -142,7 +139,7 @@ jobs:
           PY
           {
             echo "Source commit: $GITHUB_SHA"
-            echo 'Application: Venera Prime Fork'
+            echo 'Application: Venera Z'
             echo 'Package: com.github.zklall.venera.prime'
             echo 'Signed with an independent fork development key.'
             echo 'Install alongside Venera Prime; app data is separate.'
@@ -150,7 +147,7 @@ jobs:
               echo
               basename "$apk"
               "$apksigner_path" verify --print-certs "$apk"
-              "$aapt_path" dump badging "$apk" | sed -n '1p'
+              "$aapt_path" dump badging "$apk" | sed -n '1p;/^application-label:/p'
               sha256sum "$apk"
             done
           } | tee "$output_dir/build-info.txt"

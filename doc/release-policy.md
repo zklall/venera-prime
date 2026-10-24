@@ -6,7 +6,7 @@
 
 - 遵从用户明确指定的版本，不因当前分支、已有草稿或语义化版本推断而擅自改成其他版本。版本冲突应先说明实际状态，再按用户指示处理。
 - `pubspec.yaml` 的版本及构建号、`lib/foundation/app.dart` 的运行时版本、`doc/release-X.Y.Z.md` 的标题和 `vX.Y.Z` 标签必须一致。执行 `RELEASE_TAG=vX.Y.Z python3 tool/check_version.py` 核验；命令中的版本应替换为实际目标版本。
-- 发布说明保存在 `doc/release-X.Y.Z.md`，第一行固定为 `# Venera Prime X.Y.Z`。GitHub Release 使用同一文件作为正文，避免本地与线上说明不一致。
+- 发布说明保存在 `doc/release-X.Y.Z.md`，第一行固定为 `# Venera Z X.Y.Z`。GitHub Release 使用同一文件作为正文，避免本地与线上说明不一致。
 - 已有 Release 的正文、附件和标签不因准备新版本而被改动。补发或重发已有版本须在用户授权范围内处理。
 
 ## 编写前核实

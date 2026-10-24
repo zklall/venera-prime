@@ -154,14 +154,10 @@ class _LiquidGlassState extends State<LiquidGlass> {
       surface = BackdropFilter(
         filterConfig: _GlassRefractionFilter(
           _shader!,
-          widget.borderRadius,
           MediaQuery.devicePixelRatioOf(context),
           () {
             final box = context.findRenderObject()! as RenderBox;
-            return Rect.fromPoints(
-              box.localToGlobal(Offset.zero),
-              box.localToGlobal(Offset(box.size.width, box.size.height)),
-            );
+            return _GlassGeometry.fromBox(box, widget.borderRadius);
           },
         ),
         child: surface,
@@ -182,30 +178,26 @@ class _LiquidGlassState extends State<LiquidGlass> {
 
 @immutable
 class _GlassRefractionFilter implements ImageFilterConfig {
-  const _GlassRefractionFilter(
-    this.shader,
-    this.radius,
-    this.pixelRatio,
-    this.globalBounds,
-  );
+  const _GlassRefractionFilter(this.shader, this.pixelRatio, this.geometry);
   final ui.FragmentShader shader;
-  final BorderRadius radius;
   final double pixelRatio;
-  final Rect Function() globalBounds;
+  final _GlassGeometry Function() geometry;
 
   @override
   ui.ImageFilter resolve(ImageFilterContext context) {
-    final bounds = globalBounds();
-    final scale = bounds.width / context.bounds.width;
+    final shape = geometry();
+    final bounds = shape.bounds;
+    final radius = shape.radius;
+    final scale = shape.scale;
     shader
       ..setFloat(2, bounds.width)
       ..setFloat(3, bounds.height)
       ..setFloat(4, bounds.left)
       ..setFloat(5, bounds.top)
-      ..setFloat(6, radius.topLeft.x * scale)
-      ..setFloat(7, radius.topRight.x * scale)
-      ..setFloat(8, radius.bottomRight.x * scale)
-      ..setFloat(9, radius.bottomLeft.x * scale)
+      ..setFloat(6, radius.topLeft.x)
+      ..setFloat(7, radius.topRight.x)
+      ..setFloat(8, radius.bottomRight.x)
+      ..setFloat(9, radius.bottomLeft.x)
       ..setFloat(10, 14 * scale)
       ..setFloat(11, 5 * scale)
       ..setFloat(12, pixelRatio);
@@ -216,6 +208,46 @@ class _GlassRefractionFilter implements ImageFilterConfig {
   ui.ImageFilter? get filter => null;
   @override
   String get debugShortDescription => 'clearGlassRefraction';
+}
+
+class _GlassGeometry {
+  const _GlassGeometry(this.bounds, this.radius, this.scale);
+  final Rect bounds;
+  final BorderRadius radius;
+  final double scale;
+
+  factory _GlassGeometry.fromBox(RenderBox box, BorderRadius radius) {
+    final rect = Offset.zero & box.size;
+    final bounds = MatrixUtils.transformRect(box.getTransformTo(null), rect);
+    final scale =
+        (box.localToGlobal(rect.topRight) - box.localToGlobal(rect.topLeft))
+            .distance /
+        box.size.width;
+    final corners = <int, Radius>{};
+    // Quarter turns change the global corner order as well as width/height.
+    for (final corner in [
+      (rect.topLeft, radius.topLeft),
+      (rect.topRight, radius.topRight),
+      (rect.bottomRight, radius.bottomRight),
+      (rect.bottomLeft, radius.bottomLeft),
+    ]) {
+      final point = box.localToGlobal(corner.$1);
+      final index =
+          (point.dx > bounds.center.dx ? 1 : 0) +
+          (point.dy > bounds.center.dy ? 2 : 0);
+      corners[index] = corner.$2 * scale;
+    }
+    return _GlassGeometry(
+      bounds,
+      BorderRadius.only(
+        topLeft: corners[0]!,
+        topRight: corners[1]!,
+        bottomLeft: corners[2]!,
+        bottomRight: corners[3]!,
+      ),
+      scale,
+    );
+  }
 }
 
 class _GlassCastShadow extends CustomPainter {

@@ -578,7 +578,8 @@ class _WebdavQrScannerPageState extends State<_WebdavQrScannerPage> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
               color: Colors.black.withValues(alpha: 0.6),
               child: Text(
-                "Point the camera at a Venera WebDAV config QR code.".tl,
+                'Point the camera at a @appName WebDAV config QR code.'
+                    .tlParams({'appName': App.name}),
                 style: const TextStyle(color: Colors.white),
                 textAlign: TextAlign.center,
               ),

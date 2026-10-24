@@ -88,11 +88,11 @@ class _ReaderGestureDetectorState extends AutomaticGlobalState<_ReaderGestureDet
       },
       onPointerMove: (event) {
         if (event.pointer == _lastTapPointer) {
-          _lastTapMoveDistance = event.delta + _lastTapMoveDistance!;
+          _lastTapMoveDistance = event.localDelta + _lastTapMoveDistance!;
         }
         if (_dragInProgress) {
           for (var dragListener in _dragListeners) {
-            dragListener.onMove?.call(event.delta);
+            dragListener.onMove?.call(event.localDelta);
           }
         }
       },
@@ -205,8 +205,10 @@ class _ReaderGestureDetectorState extends AutomaticGlobalState<_ReaderGestureDet
         bool isLeft = false, isRight = false, isTop = false, isBottom = false;
         final width = context.width;
         final height = context.height;
-        final x = location.dx;
-        final y = location.dy;
+        final local = (context.findRenderObject() as RenderBox)
+            .globalToLocal(location);
+        final x = local.dx;
+        final y = local.dy;
         if (x < width * _kTapToTurnPagePercent) {
           isLeft = true;
         } else if (x > width * (1 - _kTapToTurnPagePercent)) {
@@ -296,7 +298,7 @@ class _ReaderGestureDetectorState extends AutomaticGlobalState<_ReaderGestureDet
           icon: Icons.exit_to_app,
           text: "Exit".tl,
           onClick: () {
-            context.pop();
+            reader.exitReader();
           },
         ),
         if (App.isDesktop && !reader.isLoading)

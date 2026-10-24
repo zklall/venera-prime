@@ -257,7 +257,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           tertiary = light.tertiary;
         }
         return MaterialApp(
-          title: "Venera Prime",
+          title: App.name,
           home: home,
           debugShowCheckedModeBanner: false,
           theme: getTheme(primary, secondary, tertiary, Brightness.light),
@@ -404,7 +404,7 @@ class _InitializationFailurePageState extends State<InitializationFailurePage> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Venera could not open its core data. Your existing data was left in place.',
+                  '${App.name} could not open its core data. Your existing data was left in place.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),

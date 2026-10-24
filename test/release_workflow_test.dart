@@ -69,7 +69,7 @@ void main() {
     final releaseNotes = File(
       'doc/release-$pubspecVersion.md',
     ).readAsLinesSync();
-    expect(releaseNotes.first, '# Venera Prime $pubspecVersion');
+    expect(releaseNotes.first, '# Venera Z $pubspecVersion');
 
     final aboutSource = File(
       'lib/pages/settings/about.dart',

@@ -34,10 +34,12 @@ class _AboutSettingsState extends State<AboutSettings> {
         Column(
           children: [
             const SizedBox(height: 8),
+            Text(App.name, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 4),
             Text("V${App.version}", style: const TextStyle(fontSize: 16)),
             Text(
-              "Venera Prime is a free and open-source app for comic reading."
-                  .tl,
+              '@appName is a free and open-source app for comic reading.'
+                  .tlParams({'appName': App.name}),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
@@ -56,6 +58,9 @@ class _AboutSettingsState extends State<AboutSettings> {
                   ? Text('New version available'.tl)
                   : const TaskStatusText(taskKey: 'app-update-check'),
               trailing: Button.filled(
+                onPressed: hasUpdate
+                    ? task!.onOpenResult!
+                    : () => checkUpdateUi(),
                 child: Text(
                   task?.isRunning == true
                       ? "Checking".tl
@@ -63,9 +68,6 @@ class _AboutSettingsState extends State<AboutSettings> {
                       ? "View update".tl
                       : "Check".tl,
                 ),
-                onPressed: hasUpdate
-                    ? task!.onOpenResult!
-                    : () => checkUpdateUi(),
               ).fixHeight(32),
             );
           },
