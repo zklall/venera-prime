@@ -375,37 +375,45 @@ class ContentDialog extends StatelessWidget {
         ],
       ),
     );
+    final body = AnimatedSize(
+      duration: LiquidGlass.motionDuration(context),
+      alignment: Alignment.topCenter,
+      child: IntrinsicWidth(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 600,
+            minWidth: math.min(400, context.width - 16),
+          ),
+          child: MediaQuery.removePadding(
+            removeTop: true,
+            removeBottom: true,
+            context: context,
+            child: content,
+          ),
+        ),
+      ),
+    );
+    final glass = LiquidGlass.enabledOf(context);
     return Dialog(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: context.brightness == Brightness.dark
+        borderRadius: BorderRadius.circular(glass ? 28 : 8),
+        side: !glass && context.brightness == Brightness.dark
             ? BorderSide(color: context.colorScheme.outlineVariant)
             : BorderSide.none,
       ),
       insetPadding: context.width < 400
           ? const EdgeInsets.symmetric(horizontal: 4)
           : const EdgeInsets.symmetric(horizontal: 16),
-      elevation: 2,
+      elevation: glass ? 0 : 2,
       shadowColor: context.colorScheme.shadow,
-      backgroundColor: context.colorScheme.surface,
-      child: AnimatedSize(
-        duration: const Duration(milliseconds: 200),
-        alignment: Alignment.topCenter,
-        child: IntrinsicWidth(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: 600,
-              minWidth: math.min(400, context.width - 16),
-            ),
-            child: MediaQuery.removePadding(
-              removeTop: true,
-              removeBottom: true,
-              context: context,
-              child: content,
-            ),
-          ),
-        ),
-      ),
+      backgroundColor: glass ? Colors.transparent : context.colorScheme.surface,
+      child: glass
+          ? LiquidGlass(
+              borderRadius: BorderRadius.circular(28),
+              opacity: LiquidGlass.overlayOpacityOf(context),
+              child: body,
+            )
+          : body,
     );
   }
 }

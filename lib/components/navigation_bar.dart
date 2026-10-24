@@ -103,6 +103,11 @@ class NaviPaneState extends State<NaviPane>
   double get bottomBarHeight =>
       _kBottomBarHeight + MediaQuery.of(context).padding.bottom;
 
+  double get glassBottomContentHeight => math.max(
+    _kBottomBarHeight,
+    32 + MediaQuery.textScalerOf(context).scale(11) * 1.5,
+  );
+
   void onNavigatorStateChange() {
     onRebuild(context);
   }
@@ -158,6 +163,11 @@ class NaviPaneState extends State<NaviPane>
 
   void onRebuild(BuildContext context) {
     double target = targetFormContext(context);
+    if (MediaQuery.disableAnimationsOf(context)) {
+      animationTarget = target;
+      if (controller.value != target) controller.value = target;
+      return;
+    }
     if (controller.value != target || animationTarget != target) {
       if (controller.isAnimating) {
         if (animationTarget == target) {
@@ -214,7 +224,7 @@ class NaviPaneState extends State<NaviPane>
           if (sideInsets != EdgeInsets.zero) {
             content = Padding(padding: sideInsets, child: content);
           }
-          return content;
+          return GlassBackdrop(child: content);
         },
       ),
     );
@@ -261,6 +271,37 @@ class NaviPaneState extends State<NaviPane>
   }
 
   Widget buildTop() {
+    if (LiquidGlass.enabledOf(context)) {
+      return LiquidGlass(
+        borderRadius: BorderRadius.circular(26),
+        child: SizedBox(
+          height: _kTopBarHeight,
+          child: Row(
+            children: [
+              const SizedBox(width: 20),
+              Expanded(
+                child: Text(
+                  widget.paneItems[currentPage].label,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              for (final action in widget.paneActions)
+                IconButton(
+                  tooltip: action.label,
+                  icon: Icon(action.icon, size: 21),
+                  onPressed: action.onTap,
+                ),
+              const SizedBox(width: 6),
+            ],
+          ),
+        ),
+      );
+    }
     return Material(
       child: Container(
         padding: const EdgeInsets.only(left: 16, right: 16),
@@ -288,6 +329,51 @@ class NaviPaneState extends State<NaviPane>
   }
 
   Widget buildBottom() {
+    if (LiquidGlass.enabledOf(context)) {
+      return LiquidGlass(
+        borderRadius: BorderRadius.circular(34),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        child: SizedBox(
+          height: glassBottomContentHeight,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final itemWidth = constraints.maxWidth / widget.paneItems.length;
+              return Stack(
+                children: [
+                  AnimatedPositionedDirectional(
+                    start: itemWidth * currentPage + 3,
+                    width: math.max(0, itemWidth - 6),
+                    top: 3,
+                    bottom: 3,
+                    duration: LiquidGlass.motionDuration(context),
+                    curve: Curves.easeOutCubic,
+                    child: DecoratedBox(
+                      decoration: LiquidGlass.selectionDecoration(
+                        context,
+                        radius: 28,
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: List.generate(
+                      widget.paneItems.length,
+                      (index) => Expanded(
+                        child: _SingleBottomNaviWidget(
+                          key: ValueKey(index),
+                          enabled: currentPage == index,
+                          entry: widget.paneItems[index],
+                          onTap: () => updatePage(index),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      );
+    }
     return Material(
       textStyle: Theme.of(context).textTheme.labelSmall,
       elevation: 0,
@@ -321,72 +407,86 @@ class NaviPaneState extends State<NaviPane>
 
   Widget buildLeft() {
     final value = controller.value;
-    const paddingHorizontal = 12.0;
-    return Material(
-      child: Container(
-        width:
-            _kFoldedSideBarWidth +
-            (_kSideBarWidth - _kFoldedSideBarWidth) * ((value - 2).clamp(0, 1)),
-        height: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: paddingHorizontal),
-        decoration: BoxDecoration(
-          border: Border(
-            right: BorderSide(
-              color: Theme.of(context).colorScheme.outlineVariant,
-              width: 1.0,
+    final glass = LiquidGlass.enabledOf(context);
+    final paddingHorizontal = glass ? 6.0 : 12.0;
+    final width =
+        _kFoldedSideBarWidth +
+        (_kSideBarWidth - _kFoldedSideBarWidth) * ((value - 2).clamp(0, 1));
+    final content = Container(
+      width: width - (glass ? 12 : 0),
+      height: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: paddingHorizontal),
+      decoration: BoxDecoration(
+        border: glass
+            ? null
+            : Border(
+                right: BorderSide(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                  width: 1.0,
+                ),
+              ),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final insets = MediaQuery.of(context);
+          final topPadding = math.max(
+            insets.padding.top,
+            insets.viewPadding.top,
+          );
+          final bottomPadding = math.max(
+            insets.padding.bottom,
+            insets.viewPadding.bottom,
+          );
+          final minHeight =
+              32.0 +
+              topPadding +
+              bottomPadding +
+              48.0 * (widget.paneItems.length + widget.paneActions.length);
+          final needsScroll = constraints.maxHeight < minHeight;
+          final children = <Widget>[
+            const SizedBox(height: 16),
+            SizedBox(height: topPadding),
+            ...List<Widget>.generate(
+              widget.paneItems.length,
+              (index) => _SideNaviWidget(
+                enabled: currentPage == index,
+                entry: widget.paneItems[index],
+                showTitle: value == 3,
+                onTap: () {
+                  updatePage(index);
+                },
+                key: ValueKey(index),
+              ),
             ),
-          ),
-        ),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final insets = MediaQuery.of(context);
-            final topPadding = math.max(
-              insets.padding.top,
-              insets.viewPadding.top,
-            );
-            final bottomPadding = math.max(
-              insets.padding.bottom,
-              insets.viewPadding.bottom,
-            );
-            final minHeight =
-                32.0 +
-                topPadding +
-                bottomPadding +
-                48.0 * (widget.paneItems.length + widget.paneActions.length);
-            final needsScroll = constraints.maxHeight < minHeight;
-            final children = <Widget>[
-              const SizedBox(height: 16),
-              SizedBox(height: topPadding),
-              ...List<Widget>.generate(
-                widget.paneItems.length,
-                (index) => _SideNaviWidget(
-                  enabled: currentPage == index,
-                  entry: widget.paneItems[index],
-                  showTitle: value == 3,
-                  onTap: () {
-                    updatePage(index);
-                  },
-                  key: ValueKey(index),
-                ),
+            if (needsScroll) const SizedBox(height: 16) else const Spacer(),
+            ...List<Widget>.generate(
+              widget.paneActions.length,
+              (index) => _PaneActionWidget(
+                entry: widget.paneActions[index],
+                showTitle: value == 3,
+                key: ValueKey(index + widget.paneItems.length),
               ),
-              if (needsScroll) const SizedBox(height: 16) else const Spacer(),
-              ...List<Widget>.generate(
-                widget.paneActions.length,
-                (index) => _PaneActionWidget(
-                  entry: widget.paneActions[index],
-                  showTitle: value == 3,
-                  key: ValueKey(index + widget.paneItems.length),
-                ),
-              ),
-              SizedBox(height: 16 + bottomPadding),
-            ];
-            final column = Column(
-              mainAxisSize: needsScroll ? MainAxisSize.min : MainAxisSize.max,
-              children: children,
-            );
-            return needsScroll ? SingleChildScrollView(child: column) : column;
-          },
-        ),
+            ),
+            SizedBox(height: 16 + bottomPadding),
+          ];
+          final column = Column(
+            mainAxisSize: needsScroll ? MainAxisSize.min : MainAxisSize.max,
+            children: children,
+          );
+          return needsScroll ? SingleChildScrollView(child: column) : column;
+        },
+      ),
+    );
+    return SizedBox(
+      width: width,
+      child: Padding(
+        padding: glass ? const EdgeInsets.all(6) : EdgeInsets.zero,
+        child: glass
+            ? LiquidGlass(
+                borderRadius: BorderRadius.circular(28),
+                child: content,
+              )
+            : Material(child: content),
       ),
     );
   }
@@ -417,13 +517,19 @@ class _SideNaviWidget extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
+        duration: LiquidGlass.motionDuration(context),
         padding: const EdgeInsets.symmetric(horizontal: 12),
         height: 48,
-        decoration: BoxDecoration(
-          color: enabled ? colorScheme.primaryContainer : null,
-          borderRadius: BorderRadius.circular(12),
-        ),
+        decoration: LiquidGlass.enabledOf(context)
+            ? LiquidGlass.selectionDecoration(
+                context,
+                selected: enabled ? 1 : 0,
+                radius: 16,
+              )
+            : BoxDecoration(
+                color: enabled ? colorScheme.primaryContainer : null,
+                borderRadius: BorderRadius.circular(12),
+              ),
         child: showTitle
             ? Row(
                 children: [icon, const SizedBox(width: 12), Text(entry.label)],
@@ -500,6 +606,11 @@ class _SingleBottomNaviWidgetState extends State<_SingleBottomNaviWidget>
   void didUpdateWidget(covariant _SingleBottomNaviWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.enabled != widget.enabled) {
+      if (LiquidGlass.enabledOf(context) ||
+          MediaQuery.maybeOf(context)?.disableAnimations == true) {
+        controller.value = widget.enabled ? 1 : 0;
+        return;
+      }
       if (widget.enabled) {
         controller.forward(from: 0);
       } else {
@@ -527,8 +638,8 @@ class _SingleBottomNaviWidgetState extends State<_SingleBottomNaviWidget>
           cursor: SystemMouseCursors.click,
           onEnter: (details) => setState(() => isHovering = true),
           onExit: (details) => setState(() => isHovering = false),
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(30),
             onTap: widget.onTap,
             child: buildContent(),
           ),
@@ -540,6 +651,54 @@ class _SingleBottomNaviWidgetState extends State<_SingleBottomNaviWidget>
   Widget buildContent() {
     final value = controller.value;
     final colorScheme = Theme.of(context).colorScheme;
+    if (LiquidGlass.enabledOf(context)) {
+      return Semantics(
+        button: true,
+        selected: widget.enabled,
+        label: widget.entry.label,
+        child: ExcludeSemantics(
+          child: Tooltip(
+            message: widget.entry.label,
+            child: AnimatedContainer(
+              duration: LiquidGlass.motionDuration(context),
+              margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      widget.enabled
+                          ? widget.entry.activeIcon
+                          : widget.entry.icon,
+                      size: 22,
+                      color: widget.enabled
+                          ? colorScheme.primary
+                          : colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      widget.entry.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        height: 1.15,
+                        fontWeight: widget.enabled
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                        color: widget.enabled
+                            ? colorScheme.primary
+                            : colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     final icon = Icon(
       widget.enabled ? widget.entry.activeIcon : widget.entry.icon,
     );
@@ -690,6 +849,48 @@ class _NaviMainViewState extends State<_NaviMainView> {
   @override
   Widget build(BuildContext context) {
     var shouldShowAppBar = state.controller.value < 2;
+    if (LiquidGlass.enabledOf(context)) {
+      final mq = MediaQuery.of(context);
+      return GlassBackdrop(
+        child: Stack(
+          children: [
+            Positioned.fill(
+              top: shouldShowAppBar ? mq.padding.top + 64 : 0,
+              child: MediaQuery(
+                data: mq.copyWith(
+                  padding: mq.padding.copyWith(
+                    top: shouldShowAppBar ? 0 : mq.padding.top,
+                    bottom: shouldShowAppBar
+                        ? mq.padding.bottom +
+                              state.glassBottomContentHeight +
+                              28
+                        : mq.padding.bottom,
+                  ),
+                ),
+                child: AnimatedSwitcher(
+                  duration: LiquidGlass.motionDuration(context),
+                  child: state.buildMainViewContent(),
+                ),
+              ),
+            ),
+            if (shouldShowAppBar) ...[
+              Positioned(
+                top: mq.padding.top + 8,
+                left: 12,
+                right: 12,
+                child: state.buildTop(),
+              ),
+              Positioned(
+                bottom: mq.padding.bottom + 10,
+                left: 12,
+                right: 12,
+                child: state.buildBottom(),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
     return Column(
       children: [
         if (shouldShowAppBar) state.buildTop().paddingTop(context.padding.top),

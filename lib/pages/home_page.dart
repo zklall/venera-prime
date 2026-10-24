@@ -235,15 +235,8 @@ class _ReadLaterState extends State<_ReadLater> {
   Widget build(BuildContext context) {
     if (comics.isEmpty) return const SliverPadding(padding: EdgeInsets.zero);
     return SliverToBoxAdapter(
-      child: Container(
+      child: GlassCard(
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outlineVariant,
-            width: .6,
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
         child: Column(
           children: [
             ListTile(
@@ -315,15 +308,8 @@ class _ReadingStatisticsPreviewState extends State<_ReadingStatisticsPreview> {
     final maximum = week.fold(0, (max, value) => value > max ? value : max);
 
     return SliverToBoxAdapter(
-      child: Container(
+      child: GlassCard(
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outlineVariant,
-            width: .6,
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
         child: Column(
           children: [
             ListTile(
@@ -422,30 +408,39 @@ class _SearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(32);
+    final content = InkWell(
+      borderRadius: radius,
+      onTap: () => context.to(() => const SearchPage()),
+      child: Row(
+        children: [
+          const SizedBox(width: 18),
+          Icon(Icons.search, color: context.colorScheme.onSurfaceVariant),
+          const SizedBox(width: 10),
+          Text('Search'.tl, style: ts.s16),
+          const Spacer(),
+          if (LiquidGlass.enabledOf(context)) ...[
+            Icon(
+              Icons.arrow_forward_rounded,
+              size: 20,
+              color: context.colorScheme.primary,
+            ),
+            const SizedBox(width: 18),
+          ],
+        ],
+      ),
+    );
     return SliverToBoxAdapter(
       child: Container(
         height: App.isMobile ? 52 : 46,
-        width: double.infinity,
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        child: Material(
-          color: context.colorScheme.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(32),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(32),
-            onTap: () {
-              context.to(() => const SearchPage());
-            },
-            child: Row(
-              children: [
-                const SizedBox(width: 16),
-                const Icon(Icons.search),
-                const SizedBox(width: 8),
-                Text('Search'.tl, style: ts.s16),
-                const Spacer(),
-              ],
-            ),
-          ),
-        ),
+        child: LiquidGlass.enabledOf(context)
+            ? LiquidGlass(blur: 0, borderRadius: radius, child: content)
+            : Material(
+                color: context.colorScheme.surfaceContainerHigh,
+                borderRadius: radius,
+                child: content,
+              ),
       ),
     );
   }
@@ -525,14 +520,8 @@ class _SyncDataWidgetState extends State<_SyncDataWidget>
       );
     } else {
       child = SliverToBoxAdapter(
-        child: Container(
+        child: GlassCard(
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: Theme.of(context).colorScheme.outlineVariant,
-            ),
-            borderRadius: BorderRadius.circular(8),
-          ),
           child: ListTile(
             leading: const Icon(Icons.sync),
             title: Text('Sync Data'.tl),
@@ -635,15 +624,8 @@ class _HistoryState extends State<_History> {
   @override
   Widget build(BuildContext context) {
     return SliverToBoxAdapter(
-      child: Container(
+      child: GlassCard(
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outlineVariant,
-            width: 0.6,
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
           onTap: () {
@@ -747,15 +729,8 @@ class _LocalState extends State<_Local> {
   @override
   Widget build(BuildContext context) {
     return SliverToBoxAdapter(
-      child: Container(
+      child: GlassCard(
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outlineVariant,
-            width: 0.6,
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
           onTap: () {
@@ -1074,15 +1049,8 @@ class _ComicSourceWidgetState extends State<_ComicSourceWidget> {
   @override
   Widget build(BuildContext context) {
     return SliverToBoxAdapter(
-      child: Container(
+      child: GlassCard(
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outlineVariant,
-            width: 0.6,
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
           onTap: () {
@@ -1280,15 +1248,8 @@ class _ImageFavoritesState extends State<ImageFavorites> {
     bool hasData =
         imageFavoritesCompute != null && !imageFavoritesCompute!.isEmpty;
     return SliverToBoxAdapter(
-      child: Container(
+      child: GlassCard(
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outlineVariant,
-            width: 0.6,
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
           onTap: () {

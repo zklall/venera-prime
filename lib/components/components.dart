@@ -35,6 +35,9 @@ import 'package:venera/utils/opencc.dart';
 import 'package:venera/utils/tags_translation.dart';
 import 'package:venera/utils/translations.dart';
 
+import 'liquid_glass.dart';
+export 'liquid_glass.dart';
+
 part 'image.dart';
 part 'appbar.dart';
 part 'button.dart';

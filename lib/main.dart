@@ -210,6 +210,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       ),
       fontFamily: font,
       fontFamilyFallback: fallback,
+      extensions: [
+        LiquidGlassTheme(enabled: appdata.settings['liquidGlass'] != false),
+      ],
     );
   }
 

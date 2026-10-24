@@ -1,5 +1,7 @@
 {
   "zh_CN": {
+    "Liquid glass": "液态玻璃",
+    "Translucent surfaces, soft highlights and floating navigation.": "透光面板、柔和高光与悬浮导航。",
     "Align this spread seam": "校正这一跨页的接缝",
     "No reliable seam correction found": "未找到可靠的接缝校正方式",
     "Right-to-left order within spreads": "双页内从右向左排页",
@@ -698,6 +700,8 @@
     "Read a comic or swipe left to mark its latest chapters as read. Following stays enabled.": "阅读漫画或左滑可标记已看完最新章节，仍保留追更。"
   },
   "zh_TW": {
+    "Liquid glass": "液態玻璃",
+    "Translucent surfaces, soft highlights and floating navigation.": "透光面板、柔和高光與懸浮導覽。",
     "Align this spread seam": "校正這一跨頁的接縫",
     "No reliable seam correction found": "未找到可靠的接縫校正方式",
     "Right-to-left order within spreads": "雙頁內從右向左排頁",

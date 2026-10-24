@@ -258,14 +258,21 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
       context.reader.chapter - 1,
     );
 
-    return BlurEffect(
+    return _ReaderToolbarSurface(
       child: Container(
         padding: EdgeInsets.only(top: context.padding.top),
         decoration: BoxDecoration(
-          color: context.colorScheme.surface.toOpacity(0.92),
-          border: Border(
-            bottom: BorderSide(color: Colors.grey.toOpacity(0.5), width: 0.5),
-          ),
+          color: LiquidGlass.enabledOf(context)
+              ? Colors.transparent
+              : context.colorScheme.surface.toOpacity(0.92),
+          border: LiquidGlass.enabledOf(context)
+              ? null
+              : Border(
+                  bottom: BorderSide(
+                    color: Colors.grey.toOpacity(0.5),
+                    width: 0.5,
+                  ),
+                ),
         ),
         child: Padding(
           padding: EdgeInsets.only(
@@ -735,11 +742,13 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
       ),
     );
 
-    return BlurEffect(
+    return _ReaderToolbarSurface(
       child: Container(
         decoration: BoxDecoration(
-          color: context.colorScheme.surface.toOpacity(0.92),
-          border: isOpen
+          color: LiquidGlass.enabledOf(context)
+              ? Colors.transparent
+              : context.colorScheme.surface.toOpacity(0.92),
+          border: isOpen && !LiquidGlass.enabledOf(context)
               ? Border(
                   top: BorderSide(
                     color: Colors.grey.toOpacity(0.5),
@@ -1433,4 +1442,19 @@ class _SelectImageOverlayContentState
       ),
     );
   }
+}
+
+class _ReaderToolbarSurface extends StatelessWidget {
+  const _ReaderToolbarSurface({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => LiquidGlass.enabledOf(context)
+      ? LiquidGlass(
+          borderRadius: BorderRadius.circular(22),
+          shadow: false,
+          opacity: Theme.of(context).brightness == Brightness.dark ? .68 : .56,
+          child: child,
+        )
+      : BlurEffect(child: child);
 }

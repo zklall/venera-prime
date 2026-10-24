@@ -48,6 +48,7 @@ Future<dynamic> openReader(
   int initialPage = 10,
   bool useDefaultSpreadCover = false,
   bool useDefaultSpreadPageOrder = false,
+  ThemeData? theme,
 }) async {
   tester.view.physicalSize = const Size(1000, 600);
   tester.view.devicePixelRatio = 1;
@@ -176,6 +177,7 @@ Future<dynamic> openReader(
   await tester.pumpWidget(
     MaterialApp(
       navigatorKey: App.rootNavigatorKey,
+      theme: theme,
       builder: (context, child) => WindowFrame(child!),
       home: Reader(
         type: ComicType.local,

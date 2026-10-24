@@ -13,6 +13,14 @@ class _AppearanceSettingsState extends State<AppearanceSettings> {
     return SmoothCustomScrollView(
       slivers: [
         SliverAppbar(title: Text("Appearance".tl)),
+        _SwitchSetting(
+          title: 'Liquid glass'.tl,
+          subtitle:
+              'Translucent surfaces, soft highlights and floating navigation.'
+                  .tl,
+          settingKey: 'liquidGlass',
+          onChanged: App.forceRebuild,
+        ).toSliver(),
         ListTile(
           leading: const Icon(Icons.dashboard_customize_outlined),
           title: Text('Customize home'.tl),

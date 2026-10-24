@@ -90,7 +90,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Material(child: buildBody());
+    return Material(child: GlassBackdrop(child: buildBody()));
   }
 
   Widget buildBody() {
@@ -270,7 +270,7 @@ class _SettingsDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(child: _buildPage());
+    return Material(child: GlassBackdrop(child: _buildPage()));
   }
 
   Widget _buildPage() {
