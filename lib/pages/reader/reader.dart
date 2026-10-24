@@ -819,7 +819,7 @@ abstract mixin class _ImagePerPageHandler {
   bool showSingleImageOnFirstPage() => appdata.settings.getReaderSetting(
     cid,
     type.sourceKey,
-    'showSingleImageOnFirstPage',
+    twoPageSpread ? 'readerSpreadSingleCover' : 'showSingleImageOnFirstPage',
   );
 
   bool get twoPageSpread =>
