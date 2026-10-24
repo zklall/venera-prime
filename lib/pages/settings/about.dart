@@ -78,7 +78,7 @@ class _AboutSettingsState extends State<AboutSettings> {
           title: const Text("GitHub"),
           trailing: const Icon(Icons.open_in_new),
           onTap: () {
-            launchUrlString("https://github.com/venera-app/venera-prime");
+            launchUrlString(AppReleaseSource.repositoryUrl);
           },
         ).toSliver(),
         ListTile(
@@ -93,21 +93,7 @@ class _AboutSettingsState extends State<AboutSettings> {
   }
 }
 
-Future<LatestRelease?> checkUpdate() async {
-  const url =
-      "https://api.github.com/repos/venera-app/venera-prime/releases/latest";
-  final res = await AppDio().get<Map<String, dynamic>>(
-    url,
-    options: Options(
-      headers: {"Accept": "application/vnd.github+json", "cache-time": "no"},
-      responseType: ResponseType.json,
-    ),
-  );
-  if (res.statusCode != 200 || res.data == null) {
-    throw StateError('Release request failed: ${res.statusCode}');
-  }
-  return LatestRelease.fromJson(res.data!);
-}
+Future<LatestRelease?> checkUpdate() => fetchLatestAppRelease();
 
 Future<LatestRelease?> startAppUpdateCheck({
   Future<LatestRelease?> Function()? fetch,
@@ -116,10 +102,7 @@ Future<LatestRelease?> startAppUpdateCheck({
   "Check for updates".tl,
   (task) async {
     final release = await (fetch ?? checkUpdate)();
-    if (release == null) {
-      throw const FormatException('Invalid release response');
-    }
-    if (isNewerAppVersion(release.version, App.version)) {
+    if (release != null && isNewerAppVersion(release.version, App.version)) {
       task.update(message: '${release.title} (${release.version})');
       task.resultLabel = "View update".tl;
       task.onOpenResult = () => showAppUpdateDialog(release);

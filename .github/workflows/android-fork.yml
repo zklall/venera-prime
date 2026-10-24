@@ -9,9 +9,18 @@ on:
         type: choice
         default: arm64-v8a
         options: [arm64-v8a, armeabi-v7a, x86_64]
+      publish_release:
+        description: Publish the APK through the automated release workflow
+        type: boolean
+        default: false
+      release_tag:
+        description: Existing version tag to publish
+        type: string
+        default: ''
 
 permissions:
   contents: read
+  actions: write
 
 jobs:
   android:
@@ -19,6 +28,7 @@ jobs:
     timeout-minutes: 45
     env:
       FORK_ANDROID_ABI: ${{ inputs.android_abi || 'arm64-v8a' }}
+      FORK_SIGNING_SHA256: 6db7d944002ffc1a5fe2e33f0f186877355251a4184ca55512dac3c722fdc1b7
     steps:
       - uses: actions/checkout@v4
 
@@ -48,15 +58,17 @@ jobs:
       - name: Prepare fork signing
         env:
           FORK_KEY_DIR: ${{ runner.temp }}/fork-signing
+          FORK_KEYSTORE_BASE64: ${{ secrets.FORK_ANDROID_KEYSTORE_BASE64 }}
         run: |
           set -euo pipefail
           mkdir -p "$FORK_KEY_DIR"
-          if [ ! -f "$FORK_KEY_DIR/fork.jks" ]; then
-            keytool -genkeypair -noprompt -keystore "$FORK_KEY_DIR/fork.jks" \
-              -storetype JKS -storepass android -keypass android \
-              -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
-              -dname "CN=Venera Prime Fork, OU=Development, O=zklall"
+          if [ -n "$FORK_KEYSTORE_BASE64" ]; then
+            printf '%s' "$FORK_KEYSTORE_BASE64" | base64 --decode > "$FORK_KEY_DIR/fork.jks"
           fi
+          test -f "$FORK_KEY_DIR/fork.jks" || { echo 'Restore the existing fork signing key before building'; exit 1; }
+          certificate_sha="$(keytool -exportcert -keystore "$FORK_KEY_DIR/fork.jks" \
+            -storepass android -alias androiddebugkey | sha256sum | cut -d' ' -f1)"
+          test "$certificate_sha" = "$FORK_SIGNING_SHA256"
           cat > android/key.properties <<EOF
           storeFile=$FORK_KEY_DIR/fork.jks
           storePassword=android
@@ -151,3 +163,18 @@ jobs:
             build/app/outputs/apk/release/build-info.txt
           if-no-files-found: error
           retention-days: 30
+
+      - name: Start automated fork release
+        if: ${{ inputs.publish_release }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORK_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          test "$FORK_ANDROID_ABI" = arm64-v8a
+          test -n "$FORK_RELEASE_TAG"
+          gh workflow run main.yml --repo "$GITHUB_REPOSITORY" --ref "$FORK_RELEASE_TAG" \
+            -f build_macos=false -f build_ios=false -f build_android=false \
+            -f build_windows=false -f build_linux=false -f build_linux_arm64=false \
+            -f publish_release=true -f allow_personal_trigger=false \
+            -f release_tag="$FORK_RELEASE_TAG" -f fork_android_run_id="$GITHUB_RUN_ID"

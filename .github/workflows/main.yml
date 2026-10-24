@@ -51,11 +51,16 @@ on:
         description: 'Existing tag to publish when publish_release is enabled'
         required: false
         type: string
+      fork_android_run_id:
+        description: 'Publish the ARM64 APK from an existing fork build run'
+        required: false
+        type: string
   release:
     types: [published]
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   Validate_Version:
@@ -234,6 +239,36 @@ jobs:
           name: android_build
           path: build/app/outputs/apk/release
 
+  Collect_Fork_Android:
+    needs: Validate_Version
+    if: ${{ inputs.fork_android_run_id }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - name: Verify the APK build belongs to this release commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORK_SOURCE_RUN_ID: ${{ inputs.fork_android_run_id }}
+        run: |
+          set -euo pipefail
+          source_sha="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$FORK_SOURCE_RUN_ID" --jq '.head_sha')"
+          test "$source_sha" = "$GITHUB_SHA"
+          source_workflow="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$FORK_SOURCE_RUN_ID" --jq '.path')"
+          test "$source_workflow" = '.github/workflows/android-fork.yml'
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-fork-arm64-v8a-apk
+          path: outputs
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.fork_android_run_id }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android_build
+          path: outputs/*.apk
+          if-no-files-found: error
+
   Build_Windows:
     needs: Validate_Version
     if: ${{ github.event_name == 'release' || inputs.build_windows }}
@@ -339,7 +374,7 @@ jobs:
 
   Release:
     runs-on: ubuntu-22.04
-    needs: [Validate_Version, Build_MacOS, Build_IOS, Build_Android, Build_Windows, Build_Linux, Build_Linux_ARM64]
+    needs: [Validate_Version, Build_MacOS, Build_IOS, Build_Android, Build_Windows, Build_Linux, Build_Linux_ARM64, Collect_Fork_Android]
     if: ${{ always() && (github.event_name == 'release' || inputs.publish_release) && needs.Validate_Version.result == 'success' }}
     steps:
       - name: Require successful platform builds
@@ -374,7 +409,7 @@ jobs:
   Update_AltStore:
     runs-on: ubuntu-22.04
     needs: [Validate_Version, Release]
-    if: ${{ needs.Release.result == 'success' }}
+    if: ${{ needs.Release.result == 'success' && !inputs.fork_android_run_id }}
     steps:
       - uses: actions/checkout@v4
         with:

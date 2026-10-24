@@ -7,6 +7,31 @@ import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/log.dart';
 import 'package:venera/network/app_dio.dart';
 
+class AppReleaseSource {
+  static const repository = 'zklall/venera-prime';
+  static const repositoryUrl = 'https://github.com/$repository';
+  static const latestReleaseUrl = '$repositoryUrl/releases/latest';
+  static const latestReleaseApiUrl =
+      'https://api.github.com/repos/$repository/releases/latest';
+  static const downloadPath = '/$repository/releases/download/';
+}
+
+Future<LatestRelease?> fetchLatestAppRelease({Dio? dio}) async {
+  final res = await (dio ?? AppDio()).get<Map<String, dynamic>>(
+    AppReleaseSource.latestReleaseApiUrl,
+    options: Options(
+      headers: {'Accept': 'application/vnd.github+json', 'cache-time': 'no'},
+      responseType: ResponseType.json,
+      validateStatus: (status) => status == 200 || status == 404,
+    ),
+  );
+  if (res.statusCode == 404) return null;
+  if (res.statusCode != 200 || res.data == null) {
+    throw StateError('Release request failed: ${res.statusCode}');
+  }
+  return LatestRelease.fromJson(res.data!);
+}
+
 class ReleaseAsset {
   const ReleaseAsset({
     required this.name,
@@ -31,7 +56,7 @@ class ReleaseAsset {
     if (uri == null ||
         uri.scheme != 'https' ||
         uri.host != 'github.com' ||
-        !uri.path.startsWith('/venera-app/venera-prime/releases/download/')) {
+        !uri.path.startsWith(AppReleaseSource.downloadPath)) {
       return null;
     }
     return ReleaseAsset(
@@ -66,9 +91,7 @@ class LatestRelease {
       version: tag.replaceFirst(RegExp(r'^[vV]'), '').split('+').first,
       title: name.isEmpty ? tag : name,
       body: data['body']?.toString().trim() ?? '',
-      url:
-          data['html_url']?.toString() ??
-          'https://github.com/venera-app/venera-prime/releases/latest',
+      url: data['html_url']?.toString() ?? AppReleaseSource.latestReleaseUrl,
       assets: [
         for (final entry
             in (data['assets'] as List? ?? const []).whereType<Map>())

@@ -36,7 +36,15 @@ void main() {
     expect(BackgroundTasks.instance.lastFinished(task.key), isNotNull);
   });
 
-  test('network and invalid release errors remain failures', () async {
+  test('a fork without releases completes without an update', () async {
+    expect(await startAppUpdateCheck(fetch: () async => null), isNull);
+    final task = BackgroundTasks.instance.latest('app-update-check')!;
+    expect(task.status, BackgroundTaskStatus.completed);
+    expect(task.onOpenResult, isNull);
+    expect(task.message, 'No new version available'.tl);
+  });
+
+  test('network and malformed release errors remain failures', () async {
     await expectLater(
       startAppUpdateCheck(fetch: () async => throw StateError('offline')),
       throwsStateError,
@@ -46,7 +54,7 @@ void main() {
       BackgroundTaskStatus.failed,
     );
     await expectLater(
-      startAppUpdateCheck(fetch: () async => null),
+      startAppUpdateCheck(fetch: () async => LatestRelease.fromJson({})),
       throwsFormatException,
     );
     final task = BackgroundTasks.instance.latest('app-update-check')!;

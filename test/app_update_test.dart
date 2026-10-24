@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
@@ -10,7 +11,7 @@ import 'package:venera/network/app_dio.dart' show AppDio;
 
 ReleaseAsset apk(String name) => ReleaseAsset(
   name: name,
-  url: 'https://github.com/venera-app/venera-prime/releases/download/v3/$name',
+  url: 'https://github.com/zklall/venera-prime/releases/download/v3/$name',
   size: 4,
 );
 LatestRelease release(List<ReleaseAsset> assets) =>
@@ -56,13 +57,63 @@ void main() {
             'browser_download_url': 'https://example.com/app.apk',
             'size': 4,
           },
+          {
+            'name': 'upstream.apk',
+            'browser_download_url':
+                'https://github.com/venera-app/venera-prime/releases/download/v3/upstream.apk',
+            'size': 4,
+          },
           {'name': 'broken.apk'},
         ],
       });
       expect(parsed.version, '3.0.0');
       expect(parsed.assets.single.name, 'venera.apk');
+      expect(
+        parsed.url,
+        'https://github.com/zklall/venera-prime/releases/latest',
+      );
     },
   );
+
+  test('fetches the fork release feed and accepts its APK', () async {
+    final adapter = _ReleaseFeedAdapter(200, {
+      'tag_name': 'v3.0.0',
+      'assets': [
+        {
+          'name': 'venera-arm64-v8a.apk',
+          'browser_download_url': apk('venera-arm64-v8a.apk').url,
+          'size': 4,
+        },
+      ],
+    });
+    final dio = Dio()..httpClientAdapter = adapter;
+    final latest = await fetchLatestAppRelease(dio: dio);
+    expect(
+      adapter.request!.uri.toString(),
+      'https://api.github.com/repos/zklall/venera-prime/releases/latest',
+    );
+    expect(latest!.version, '3.0.0');
+    expect(latest.androidAsset(['arm64-v8a'])!.name, 'venera-arm64-v8a.apk');
+    dio.close();
+  });
+
+  test('a fork with no published release is not a network failure', () async {
+    final dio = Dio()
+      ..httpClientAdapter = _ReleaseFeedAdapter(404, {'message': 'Not Found'});
+    expect(await fetchLatestAppRelease(dio: dio), isNull);
+    dio.close();
+  });
+
+  test('release server and malformed feed errors are preserved', () async {
+    final dio = Dio()..httpClientAdapter = _ReleaseFeedAdapter(503, {});
+    await expectLater(
+      fetchLatestAppRelease(dio: dio),
+      throwsA(isA<DioException>()),
+    );
+    dio.httpClientAdapter = _ReleaseFeedAdapter(200, {});
+    await expectLater(fetchLatestAppRelease(dio: dio), throwsFormatException);
+    dio.close();
+  });
 
   test(
     'stable version comparison handles differing lengths and build metadata',
@@ -246,3 +297,30 @@ void main() {
 }
 
 class _RealHttpOverrides extends HttpOverrides {}
+
+class _ReleaseFeedAdapter implements HttpClientAdapter {
+  _ReleaseFeedAdapter(this.statusCode, this.data);
+
+  final int statusCode;
+  final Map<String, dynamic> data;
+  RequestOptions? request;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    request = options;
+    return ResponseBody.fromString(
+      jsonEncode(data),
+      statusCode,
+      headers: {
+        Headers.contentTypeHeader: [Headers.jsonContentType],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}

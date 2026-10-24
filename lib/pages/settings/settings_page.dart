@@ -25,7 +25,6 @@ import 'package:venera/pages/settings/home_layout_page.dart';
 import 'package:venera/pages/settings/cache_retention_setting.dart';
 import 'package:venera/foundation/log.dart';
 import 'package:venera/foundation/reader_orientation_behavior.dart';
-import 'package:venera/network/app_dio.dart';
 import 'package:venera/utils/data.dart';
 import 'package:venera/utils/data_sync.dart';
 import 'package:venera/utils/io.dart';
