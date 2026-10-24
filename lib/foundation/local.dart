@@ -18,6 +18,7 @@ import 'package:venera/pages/reader/reader.dart';
 import 'package:venera/utils/io.dart';
 import 'package:venera/utils/translations.dart';
 import 'package:venera/utils/natural_sort.dart';
+import 'package:venera/utils/chapter_title_sort.dart';
 import 'package:venera/utils/atomic_file.dart';
 
 import 'app.dart';
@@ -584,7 +585,10 @@ class LocalManager with ChangeNotifier {
           chapterDirs.add(child);
         }
       }
-      chapterDirs.sort((a, b) => naturalCompare(a.name, b.name));
+      chapterDirs.sort((a, b) {
+        final result = compareChapterTitles(a.name, b.name);
+        return result == 0 ? naturalCompare(a.name, b.name) : result;
+      });
       final metadata = await _readLocalMetadata(entity);
       if (existing != null) {
         updated++;
