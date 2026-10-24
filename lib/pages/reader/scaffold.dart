@@ -485,7 +485,14 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
           icon: const Icon(Icons.menu_book_outlined),
           enabled: context.reader.canShiftImages,
           onSelected: (value) {
-            context.reader.setSpreadOverride(value == 'auto' ? null : value);
+            final reader = context.reader;
+            final start = reader.imageLayout.range(reader.page).$1;
+            final kind =
+                value == 'alignedPair' &&
+                    reader.alignedSpreadPairs.contains(start)
+                ? 'pair'
+                : value;
+            reader.setSpreadOverride(kind == 'auto' ? null : kind);
             update();
           },
           itemBuilder: (context) {
@@ -493,7 +500,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
               this.context.reader.page,
             );
             return [
-              if (end - start == 2)
+              if (end - start == 2) ...[
                 CheckedPopupMenuItem<String>(
                   value: 'pair',
                   checked: this.context.reader.joinedSpreadPairs.contains(
@@ -501,6 +508,14 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
                   ),
                   child: Text('Keep these pages as a spread'.tl),
                 ),
+                CheckedPopupMenuItem<String>(
+                  value: 'alignedPair',
+                  checked: this.context.reader.alignedSpreadPairs.contains(
+                    start,
+                  ),
+                  child: Text('Align this spread seam'.tl),
+                ),
+              ],
               if (end - start == 1) ...[
                 PopupMenuItem(
                   value: 'spread',

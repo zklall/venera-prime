@@ -28,6 +28,9 @@ class ComicImage extends StatefulWidget {
     this.onDispose,
     this.onImageReady,
     this.onImageSize,
+    this.spreadAlignment,
+    this.spreadAlignmentRightSide = false,
+    this.spreadBlendWidth = 0,
   }) : image = ResizeImage.resizeIfNeeded(cacheWidth, cacheHeight, image),
        assert(cacheWidth == null || cacheWidth > 0),
        assert(cacheHeight == null || cacheHeight > 0);
@@ -70,6 +73,9 @@ class ComicImage extends StatefulWidget {
 
   final VoidCallback? onImageReady;
   final ValueChanged<Size>? onImageSize;
+  final ReaderSpreadAlignment? spreadAlignment;
+  final bool spreadAlignmentRightSide;
+  final double spreadBlendWidth;
 
   static void clear() => _ComicImageState.clear();
 
@@ -408,7 +414,7 @@ class _ComicImageState extends State<ComicImage> with WidgetsBindingObserver {
             height: height,
             scale: _imageInfo?.scale ?? 1.0,
             color: widget.color,
-            opacity: widget.opacity,
+            opacity: widget.spreadAlignment == null ? widget.opacity : null,
             colorBlendMode: widget.colorBlendMode,
             fit: widget.fit,
             alignment: widget.alignment,
@@ -419,6 +425,37 @@ class _ComicImageState extends State<ComicImage> with WidgetsBindingObserver {
             isAntiAlias: widget.isAntiAlias,
             filterQuality: widget.filterQuality,
           );
+
+          if (widget.spreadAlignment case final alignment?) {
+            if (widget.spreadAlignmentRightSide &&
+                widget.spreadBlendWidth > 0) {
+              result = ClipRect(
+                clipper: _ReaderSpreadInnerClipper(widget.spreadBlendWidth),
+                child: result,
+              );
+            }
+            result = Stack(
+              children: [
+                result,
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: _ReaderSpreadWarpPainter(
+                      image: _imageInfo!.image,
+                      alignment: alignment,
+                      filterQuality: widget.filterQuality,
+                      invertColors: _invertColors,
+                      rightPage: widget.spreadAlignmentRightSide,
+                      blendWidth: widget.spreadBlendWidth,
+                      color: widget.color,
+                      colorBlendMode: widget.colorBlendMode,
+                    ),
+                  ),
+                ),
+              ],
+            );
+            if (widget.opacity case final opacity?)
+              result = FadeTransition(opacity: opacity, child: result);
+          }
 
           if (!widget.excludeFromSemantics) {
             result = Semantics(

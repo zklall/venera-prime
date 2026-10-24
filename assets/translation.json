@@ -1,5 +1,7 @@
 {
   "zh_CN": {
+    "Align this spread seam": "校正这一跨页的接缝",
+    "No reliable seam correction found": "未找到可靠的接缝校正方式",
     "Right-to-left order within spreads": "双页内从右向左排页",
     "Put the earlier page on the right, as in Japanese manga.": "较早的页面显示在右侧，适合日漫。",
     "Pair pages 2–3, 4–5, and so on.": "后续按第 2–3、4–5 页依次配对。",
@@ -696,6 +698,8 @@
     "Read a comic or swipe left to mark its latest chapters as read. Following stays enabled.": "阅读漫画或左滑可标记已看完最新章节，仍保留追更。"
   },
   "zh_TW": {
+    "Align this spread seam": "校正這一跨頁的接縫",
+    "No reliable seam correction found": "未找到可靠的接縫校正方式",
     "Right-to-left order within spreads": "雙頁內從右向左排頁",
     "Put the earlier page on the right, as in Japanese manga.": "較早的頁面顯示在右側，適合日漫。",
     "Pair pages 2–3, 4–5, and so on.": "後續按第 2–3、4–5 頁依次配對。",

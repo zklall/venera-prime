@@ -3,6 +3,7 @@ library;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -52,6 +53,7 @@ import 'package:venera/components/chapter_order_button.dart';
 import 'package:venera/utils/reader_appearance.dart';
 import 'package:venera/utils/reader_page_layout.dart';
 import 'package:venera/utils/reader_spread_geometry.dart';
+import 'package:venera/utils/reader_spread_alignment.dart';
 import 'package:venera/utils/volume.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:battery_plus/battery_plus.dart';
@@ -60,6 +62,7 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 part 'scaffold.dart';
 
 part 'images.dart';
+part 'spread_alignment.dart';
 
 part 'gesture.dart';
 
@@ -263,7 +266,12 @@ class _ReaderState extends State<Reader>
   @override
   Set<int> get joinedSpreadPairs => {
     for (final entry in _spreadOverrides.entries)
-      if (entry.value == 'pair') entry.key,
+      if (entry.value == 'pair' || entry.value == 'alignedPair') entry.key,
+  };
+
+  Set<int> get alignedSpreadPairs => {
+    for (final entry in _spreadOverrides.entries)
+      if (entry.value == 'alignedPair') entry.key,
   };
 
   /// Called once for a freshly loaded chapter, before constructing its gallery.
@@ -279,7 +287,10 @@ class _ReaderState extends State<Reader>
         if (index != null &&
             index >= 0 &&
             index < images!.length &&
-            (kind == 'pair' || kind == 'spread' || kind == 'page')) {
+            (kind == 'pair' ||
+                kind == 'alignedPair' ||
+                kind == 'spread' ||
+                kind == 'page')) {
           _spreadOverrides[index] = kind as String;
         }
       }
@@ -311,9 +322,10 @@ class _ReaderState extends State<Reader>
   void setSpreadOverride(String? kind) {
     if (!twoPageSpread || !canShiftImages) return;
     final (start, end) = imageLayout.range(page);
-    if (kind == 'pair' && end - start != 2) return;
+    final isPair = kind == 'pair' || kind == 'alignedPair';
+    if (isPair && end - start != 2) return;
     if ((kind == 'page' || kind == 'spread') && end - start != 1) return;
-    if (kind != null && kind != 'pair' && kind != 'page' && kind != 'spread') {
+    if (kind != null && !isPair && kind != 'page' && kind != 'spread') {
       return;
     }
     if (kind == null) {
@@ -324,8 +336,9 @@ class _ReaderState extends State<Reader>
     } else {
       _spreadOverrides.remove(start);
     }
-    if (kind == 'pair') {
-      if (_spreadOverrides[start - 1] == 'pair') {
+    if (isPair) {
+      if (_spreadOverrides[start - 1] == 'pair' ||
+          _spreadOverrides[start - 1] == 'alignedPair') {
         _spreadOverrides.remove(start - 1);
       }
       _spreadOverrides.remove(start + 1);

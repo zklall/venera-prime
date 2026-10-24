@@ -183,6 +183,64 @@ class _GalleryModeState extends State<_GalleryMode>
   bool _spreadSizeUpdateScheduled = false;
   Timer? _spreadSizeRetry;
   final _spreadMetadataStreams = <int, (ImageStream, ImageStreamListener)>{};
+  final _spreadAlignments = <int, ReaderSpreadAlignment?>{};
+
+  void _queueSpreadAlignment(int start) {
+    if (!mounted ||
+        _spreadAlignments.containsKey(start) ||
+        !reader.alignedSpreadPairs.contains(start))
+      return;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _spreadAlignments.containsKey(start)) return;
+      final ordered = reader.spreadRightToLeft
+          ? [start + 1, start]
+          : [start, start + 1];
+      ui.Image? decoded(int index) {
+        for (final state in imageStates) {
+          if (state.widget.key ==
+              ValueKey('reader-spread-image-${index + 1}')) {
+            return (state as _ComicImageState)._imageInfo?.image;
+          }
+        }
+        return null;
+      }
+
+      final left = decoded(ordered[0]), right = decoded(ordered[1]);
+      if (left == null || right == null) return;
+      _spreadAlignments[start] = null;
+      unawaited(_alignSpread(start, left.clone(), right.clone()));
+    });
+    SchedulerBinding.instance.ensureVisualUpdate();
+  }
+
+  Future<void> _alignSpread(int start, ui.Image left, ui.Image right) async {
+    try {
+      final profiles = await Future.wait([
+        _readerEdgeProfile(left, right: true),
+        _readerEdgeProfile(right, right: false),
+      ]);
+      if (profiles.any((p) => p == null)) return;
+      final alignment = await compute(
+        findReaderSpreadAlignment,
+        profiles.cast<List<double>>(),
+      );
+      if (!mounted) return;
+      setState(() => _spreadAlignments[start] = alignment);
+      if (alignment == null &&
+          reader.imageLayout.range(reader.page).$1 == start) {
+        showToast(
+          message: 'No reliable seam correction found'.tl,
+          context: context,
+          seconds: 2,
+        );
+      }
+    } catch (error, stack) {
+      Log.error('Reader seam alignment', error, stack);
+    } finally {
+      left.dispose();
+      right.dispose();
+    }
+  }
 
   void _queueSpreadSize(int index, Size size) {
     if (!mounted) return;
@@ -626,12 +684,17 @@ class _GalleryModeState extends State<_GalleryMode>
     if (reader.spreadRightToLeft) {
       slots = slots.reversed.toList();
     }
+    final alignSeam =
+        images.length == 2 && reader.alignedSpreadPairs.contains(startIndex);
     return LayoutBuilder(
       builder: (context, constraints) {
         final rects = readerSpreadRects(constraints.biggest, [
           for (final slot in slots)
             slot == null ? null : reader.spreadImageSizes[startIndex + slot],
         ]);
+        final seamBlend = alignSeam && rects.length == 2
+            ? math.min(2.0, math.min(rects[0].width, rects[1].width) * .004)
+            : 0.0;
         return Stack(
           children: [
             for (var i = 0; i < rects.length; i++)
@@ -653,6 +716,14 @@ class _GalleryModeState extends State<_GalleryMode>
                         width: rects[i].width,
                         height: rects[i].height,
                         fit: BoxFit.contain,
+                        spreadAlignment: alignSeam
+                            ? _spreadAlignments[startIndex]
+                            : null,
+                        spreadAlignmentRightSide: i == 1,
+                        spreadBlendWidth: seamBlend,
+                        onImageReady: alignSeam
+                            ? () => _queueSpreadAlignment(startIndex)
+                            : null,
                         onImageSize: (size) =>
                             _queueSpreadSize(startIndex + slots[i]!, size),
                         onInit: imageStates.add,

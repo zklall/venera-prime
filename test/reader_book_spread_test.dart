@@ -169,6 +169,35 @@ void main() {
     await closeReader(tester);
   });
 
+  testWidgets('seam correction locks its pair, persists and can be disabled', (
+    tester,
+  ) async {
+    dynamic state = await fixture.openReader(tester, 'galleryLeftToRight');
+    appdata.settings['readerTwoPageSpread'] = true;
+    state.update();
+    await fixture.settle(tester);
+    state.setSpreadOverride('alignedPair');
+    await fixture.settle(tester);
+    expect(state.alignedSpreadPairs, {8});
+    expect(state.joinedSpreadPairs, {8});
+    expect((appdata.settings['readerSpreadOverrides'] as Map).values.single, {
+      '8': 'alignedPair',
+    });
+    final root = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    await closeReader(tester);
+    await tester.pumpWidget(root);
+    await fixture.settle(tester);
+    state = tester.state(find.byType(Reader));
+    expect(state.alignedSpreadPairs, {8});
+    state.setSpreadOverride('pair');
+    await fixture.settle(tester);
+    expect(state.alignedSpreadPairs, isEmpty);
+    expect(state.joinedSpreadPairs, {8});
+    expect(state.imageLayout.range(state.page), (8, 10));
+    expect(tester.takeException(), isNull);
+    await closeReader(tester);
+  });
+
   testWidgets('reset removes a forced-page override inside a regrouped pair', (
     tester,
   ) async {
