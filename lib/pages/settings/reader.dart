@@ -107,6 +107,9 @@ class _ReaderSettingsState extends State<ReaderSettings> {
         effectiveMode == 'galleryRightToLeft';
     final twoPageSpread =
         horizontalGallery && readerSetting('readerTwoPageSpread') == true;
+    final singleCoverSettingKey = twoPageSpread
+        ? 'readerSpreadSingleCover'
+        : 'showSingleImageOnFirstPage';
 
     return SmoothCustomScrollView(
       slivers: [
@@ -430,9 +433,12 @@ class _ReaderSettingsState extends State<ReaderSettings> {
                   readerSetting('readerScreenPicNumberForPortrait') > 1),
           child: _SwitchSetting(
             title: "Show single image on first page".tl,
-            settingKey: "showSingleImageOnFirstPage",
+            subtitle: twoPageSpread
+                ? 'Pair pages 2–3, 4–5, and so on.'.tl
+                : null,
+            settingKey: singleCoverSettingKey,
             onChanged: () {
-              widget.onChanged?.call("showSingleImageOnFirstPage");
+              widget.onChanged?.call(singleCoverSettingKey);
             },
             comicId: isEnabledSpecificSettings ? widget.comicId : null,
             comicSource: isEnabledSpecificSettings ? widget.comicSource : null,
