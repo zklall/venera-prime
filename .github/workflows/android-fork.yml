@@ -9,18 +9,12 @@ on:
         type: choice
         default: arm64-v8a
         options: [arm64-v8a, armeabi-v7a, x86_64]
-      source_run_id:
-        description: Reuse an existing fork build instead of compiling again (optional)
-        type: string
-        default: ''
 
 permissions:
   contents: read
-  actions: read
 
 jobs:
   android:
-    if: ${{ !inputs.source_run_id }}
     runs-on: ubuntu-22.04
     timeout-minutes: 45
     env:
@@ -153,44 +147,3 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-  package_existing:
-    if: ${{ inputs.source_run_id }}
-    runs-on: ubuntu-22.04
-    timeout-minutes: 10
-    env:
-      FORK_ANDROID_ABI: ${{ inputs.android_abi || 'arm64-v8a' }}
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: android-fork-apks
-          path: downloaded
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ inputs.source_run_id }}
-
-      - name: Keep the phone APK
-        run: |
-          python3 - <<'PY'
-          import os
-          import shutil
-          import zipfile
-          from pathlib import Path
-
-          abi = os.environ['FORK_ANDROID_ABI']
-          apks = list(Path('downloaded').rglob(f'*-{abi}.apk'))
-          assert len(apks) == 1, apks
-          with zipfile.ZipFile(apks[0]) as apk:
-              abis = {p.split('/')[1] for p in apk.namelist() if p.startswith('lib/') and p.endswith('.so')}
-          assert abis == {abi}, abis
-          output = Path('phone-apk')
-          output.mkdir()
-          shutil.copy2(apks[0], output / apks[0].name)
-          print('Selected APK:', apks[0].name, abis)
-          PY
-          sha256sum phone-apk/*.apk >> "$GITHUB_STEP_SUMMARY"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: android-fork-${{ env.FORK_ANDROID_ABI }}-apk
-          path: phone-apk/*.apk
-          if-no-files-found: error
-          retention-days: 30
