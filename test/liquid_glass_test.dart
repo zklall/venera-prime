@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:venera/components/components.dart';
@@ -30,9 +31,12 @@ void main() {
     await tester.tapAt(const Offset(500, 300));
     await reader_fixture.settle(tester);
     final filters = find.byType(BackdropFilter);
-    expect(filters, findsNWidgets(2));
-    for (final filter in filters.evaluate()) {
-      final size = tester.getSize(find.byWidget(filter.widget));
+    expect(
+      filters,
+      ui.ImageFilter.isShaderFilterSupported ? findsNWidgets(2) : findsNothing,
+    );
+    for (final surface in find.byType(LiquidGlass).evaluate()) {
+      final size = tester.getSize(find.byWidget(surface.widget));
       expect(size.height, lessThan(200));
     }
     final before = state.page;

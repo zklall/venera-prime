@@ -53,7 +53,6 @@ class _MenuRoute<T> extends PopupRoute<T> {
             top: top,
             child: LiquidGlass(
               borderRadius: BorderRadius.circular(24),
-              opacity: LiquidGlass.overlayOpacityOf(context),
               child: SizedBox(
                 width: width,
                 child: Padding(

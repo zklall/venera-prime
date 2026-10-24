@@ -192,7 +192,6 @@ class FlyoutContent extends StatelessWidget {
       return IntrinsicWidth(
         child: LiquidGlass(
           padding: const EdgeInsets.all(20),
-          opacity: LiquidGlass.overlayOpacityOf(context),
           child: ConstrainedBox(
             constraints: const BoxConstraints(minWidth: minFlyoutWidth),
             child: Column(

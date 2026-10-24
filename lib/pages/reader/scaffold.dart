@@ -1453,7 +1453,6 @@ class _ReaderToolbarSurface extends StatelessWidget {
       ? LiquidGlass(
           borderRadius: BorderRadius.circular(22),
           shadow: false,
-          opacity: Theme.of(context).brightness == Brightness.dark ? .68 : .56,
           child: child,
         )
       : BlurEffect(child: child);

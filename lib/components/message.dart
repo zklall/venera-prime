@@ -408,11 +408,7 @@ class ContentDialog extends StatelessWidget {
       shadowColor: context.colorScheme.shadow,
       backgroundColor: glass ? Colors.transparent : context.colorScheme.surface,
       child: glass
-          ? LiquidGlass(
-              borderRadius: BorderRadius.circular(28),
-              opacity: LiquidGlass.overlayOpacityOf(context),
-              child: body,
-            )
+          ? LiquidGlass(borderRadius: BorderRadius.circular(28), child: body)
           : body,
     );
   }

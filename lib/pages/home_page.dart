@@ -435,7 +435,7 @@ class _SearchBar extends StatelessWidget {
         height: App.isMobile ? 52 : 46,
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         child: LiquidGlass.enabledOf(context)
-            ? LiquidGlass(blur: 0, borderRadius: radius, child: content)
+            ? LiquidGlass(refract: false, borderRadius: radius, child: content)
             : Material(
                 color: context.colorScheme.surfaceContainerHigh,
                 borderRadius: radius,

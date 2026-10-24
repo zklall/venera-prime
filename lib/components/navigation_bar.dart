@@ -856,15 +856,14 @@ class _NaviMainViewState extends State<_NaviMainView> {
           children: [
             Positioned.fill(
               top: shouldShowAppBar ? mq.padding.top + 64 : 0,
+              bottom: shouldShowAppBar
+                  ? mq.padding.bottom + state.glassBottomContentHeight + 28
+                  : 0,
               child: MediaQuery(
                 data: mq.copyWith(
                   padding: mq.padding.copyWith(
                     top: shouldShowAppBar ? 0 : mq.padding.top,
-                    bottom: shouldShowAppBar
-                        ? mq.padding.bottom +
-                              state.glassBottomContentHeight +
-                              28
-                        : mq.padding.bottom,
+                    bottom: shouldShowAppBar ? 0 : mq.padding.bottom,
                   ),
                 ),
                 child: AnimatedSwitcher(

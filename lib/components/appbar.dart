@@ -118,7 +118,6 @@ class _AppbarState extends State<Appbar> {
       return LiquidGlass(
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(22)),
         shadow: false,
-        opacity: _scrolledUnder ? LiquidGlass.overlayOpacityOf(context) : null,
         child: content,
       );
     } else if (widget.style == AppbarStyle.shadow) {
@@ -235,9 +234,6 @@ class _MySliverAppBarDelegate extends SliverPersistentHeaderDelegate {
               ? BorderRadius.circular(radius)
               : const BorderRadius.vertical(bottom: Radius.circular(22)),
           shadow: false,
-          opacity: overlapsContent || shrinkOffset > 0
-              ? LiquidGlass.overlayOpacityOf(context)
-              : null,
           child: SizedBox.expand(child: body),
         );
       }

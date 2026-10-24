@@ -104,6 +104,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  shaders:
+    - shaders/clear_glass.frag
   assets:
     - assets/translation.json
     - assets/init.js
