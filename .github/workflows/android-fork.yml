@@ -33,6 +33,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle
+          cache-dependency-path: |
+            android/**/*.gradle
+            android/gradle/wrapper/gradle-wrapper.properties
+            pubspec.lock
 
       # Reuse the fork's development key for subsequent builds.
       - uses: actions/cache@v4
@@ -146,4 +151,3 @@ jobs:
             build/app/outputs/apk/release/build-info.txt
           if-no-files-found: error
           retention-days: 30
-
