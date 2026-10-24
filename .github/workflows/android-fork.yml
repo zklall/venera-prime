@@ -3,17 +3,28 @@ run-name: Build fork Android APK
 
 on:
   workflow_dispatch:
-  push:
-    branches: [master]
-    paths: [.github/workflows/android-fork.yml]
+    inputs:
+      android_abi:
+        description: Phone architecture
+        type: choice
+        default: arm64-v8a
+        options: [arm64-v8a, armeabi-v7a, x86_64]
+      source_run_id:
+        description: Reuse an existing fork build instead of compiling again (optional)
+        type: string
+        default: ''
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   android:
+    if: ${{ !inputs.source_run_id }}
     runs-on: ubuntu-22.04
     timeout-minutes: 45
+    env:
+      FORK_ANDROID_ABI: ${{ inputs.android_abi || 'arm64-v8a' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -54,16 +65,34 @@ jobs:
           keyPassword=android
           EOF
 
-      - name: Give the fork a separate Android identity
+      - name: Configure fork identity and phone architecture
         run: |
           python3 - <<'PY'
+          import os
           from pathlib import Path
 
+          abi = os.environ['FORK_ANDROID_ABI']
+          platforms = {
+              'arm64-v8a': 'android-arm64',
+              'armeabi-v7a': 'android-arm',
+              'x86_64': 'android-x64',
+          }
+          assert abi in platforms
+          with open(os.environ['GITHUB_ENV'], 'a') as env:
+              env.write(f'FORK_ANDROID_PLATFORM={platforms[abi]}\n')
+
           gradle = Path('android/app/build.gradle')
-          old = ': "com.github.wgh136.venera.prime"'
           text = gradle.read_text()
-          assert text.count(old) == 1
-          gradle.write_text(text.replace(old, ': "com.github.zklall.venera.prime"'))
+          replacements = [
+              (': "com.github.wgh136.venera.prime"', ': "com.github.zklall.venera.prime"', 1),
+              ("include 'armeabi-v7a', 'arm64-v8a', 'x86_64'", f"include '{abi}'", 1),
+              ('universalApk true', 'universalApk false', 1),
+              ('abiFilters "armeabi-v7a", "arm64-v8a", "x86_64"', f'abiFilters "{abi}"', 2),
+          ]
+          for old, new, count in replacements:
+              assert text.count(old) == count, old
+              text = text.replace(old, new)
+          gradle.write_text(text)
 
           manifest = Path('android/app/src/main/AndroidManifest.xml')
           old = 'android:label="Venera Prime"'
@@ -78,8 +107,8 @@ jobs:
       - name: Install Flutter dependencies
         run: flutter pub get
 
-      - name: Build release APKs
-        run: flutter build apk --release
+      - name: Build phone release APK
+        run: flutter build apk --release --target-platform "$FORK_ANDROID_PLATFORM" --split-per-abi
 
       - name: Verify APKs and record build details
         run: |
@@ -87,6 +116,18 @@ jobs:
           apksigner_path="$(printf '%s\n' "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n 1)"
           aapt_path="$(dirname "$apksigner_path")/aapt"
           output_dir=build/app/outputs/apk/release
+          python3 - <<'PY'
+          import os
+          import zipfile
+          from pathlib import Path
+
+          apks = list(Path('build/app/outputs/apk/release').glob('*.apk'))
+          assert len(apks) == 1, apks
+          with zipfile.ZipFile(apks[0]) as apk:
+              abis = {p.split('/')[1] for p in apk.namelist() if p.startswith('lib/') and p.endswith('.so')}
+          assert abis == {os.environ['FORK_ANDROID_ABI']}, abis
+          print('Verified single APK and requested native architecture:', abis)
+          PY
           {
             echo "Source commit: $GITHUB_SHA"
             echo 'Application: Venera Prime Fork'
@@ -105,9 +146,51 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: android-fork-apks
+          name: android-fork-${{ env.FORK_ANDROID_ABI }}-apk
           path: |
             build/app/outputs/apk/release/*.apk
             build/app/outputs/apk/release/build-info.txt
+          if-no-files-found: error
+          retention-days: 30
+
+  package_existing:
+    if: ${{ inputs.source_run_id }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    env:
+      FORK_ANDROID_ABI: ${{ inputs.android_abi || 'arm64-v8a' }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-fork-apks
+          path: downloaded
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.source_run_id }}
+
+      - name: Keep the phone APK
+        run: |
+          python3 - <<'PY'
+          import os
+          import shutil
+          import zipfile
+          from pathlib import Path
+
+          abi = os.environ['FORK_ANDROID_ABI']
+          apks = list(Path('downloaded').rglob(f'*-{abi}.apk'))
+          assert len(apks) == 1, apks
+          with zipfile.ZipFile(apks[0]) as apk:
+              abis = {p.split('/')[1] for p in apk.namelist() if p.startswith('lib/') and p.endswith('.so')}
+          assert abis == {abi}, abis
+          output = Path('phone-apk')
+          output.mkdir()
+          shutil.copy2(apks[0], output / apks[0].name)
+          print('Selected APK:', apks[0].name, abis)
+          PY
+          sha256sum phone-apk/*.apk >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-fork-${{ env.FORK_ANDROID_ABI }}-apk
+          path: phone-apk/*.apk
           if-no-files-found: error
           retention-days: 30
